@@ -346,7 +346,7 @@ public function __get($key)
             return $r->invoke($this);
         }
     }
-    if (property_exists($this, $key)) {
+    if (!property_exists($this, $key)) {
         throw new PropelEloquentException("Property \'$key\' does not exist.");
     }
     return $this->$key;
