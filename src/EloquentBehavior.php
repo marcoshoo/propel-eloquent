@@ -19,12 +19,6 @@ protected $___model;
 
 /**
  *
- * @var array
- */
-protected $___args;
-
-/**
- *
  * @var boolean
  */
 protected static $___eloquentClassLoaded = false;
@@ -368,13 +362,13 @@ public function __get($key)
         $script = preg_replace($pattern, $replacement, $script);
 
         $constructor = <<<EOD
-        \$this->___args = func_get_args();
-        if (isset(\$this->___args[0])) {
-            if (\$this->___args[0] instanceof \Illuminate\Database\Eloquent\Model) {
-                \$this->___fill(\$this->___args[0]->getAttributes());
-                \$this->___model = \$this->___args[0];
-            } elseif (is_array(\$this->___args)) {
-                \$this->___loadEloquentClass(\$this->___args);
+        \$args = func_get_args();
+        if (isset(\$args[0])) {
+            if (\$args[0] instanceof \Illuminate\Database\Eloquent\Model) {
+                \$this->___fill(\$args[0]->getAttributes());
+                \$this->___model = \$args[0];
+            } elseif (is_array(\$args)) {
+                \$this->___loadEloquentClass(\$args);
             }
         }
 EOD;
