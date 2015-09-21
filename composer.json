@@ -1,0 +1,24 @@
+{
+    "name": "marcoshoo/propel-eloquent",
+    "type": "propel-behavior",
+    "description": "Propel2 behavior that makes model classes virtually extend a Eloquent model class",
+    "homepage": "http://github.com/marcoshoo/propel-eloquent",
+    "keywords": ["laravel", "eloquent","propel","propel2"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Marcos Soares",
+            "email": "marcos.hoo@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "MarcosHoo\\PropelEloquent\\": "src/"
+        }
+    },
+    "extra": {
+        "name": "eloquent",
+        "class": "\\MarcosHoo\\PropelEloquent\\EloquentBehavior"
+    }
+}
