@@ -7,10 +7,29 @@ class EloquentBehavior extends Behavior
 {
     protected $parameters = [];
 
+    public function getTableNameSpace()
+    {
+        return $this->getTable()->getNamespace();
+    }
+
+    public function getTableClassName()
+    {
+        return $this->getTable()->getPhpName();
+    }
+
+    public function getTableFullClassName()
+    {
+        return $this->getTableNameSpace() . '\\' . $this->getTableClassName();
+    }
+
+    public function getEloquentFullClassName()
+    {
+        return head(explode('\\',$this->getTableNameSpace())) . '\\' . $this->getTableClassName();
+    }
+
     public function objectMethods()
     {
         return '
-
 /**
  *
  * @var \Illuminate\Database\Eloquent\Model
@@ -23,228 +42,23 @@ protected $___model;
  */
 protected $___args;
 
-/**
- *
- * @var boolean
- */
-protected static $___eloquentClassLoaded = false;
-
-/**
- *
- * @return string
- */
-public static function ___getEloquentNamespace()
+public function ___getFillable()
 {
-    return head(explode(\'\\\\\', static::class));
-}
-
-/**
- *
- * @return string
- */
-public static function ___getEloquentBaseClassname()
-{
-    return class_basename(static::class);
-}
-
-/**
- * @return string
- */
-public static function ___getEloquentClassname()
-{
-    return self::___getEloquentNamespace() . \'\\\\\' . self::___getEloquentBaseClassname();
-}
-
-/**
- *
- * @return string
- */
-public static function ___generateEloquent()
-{
-    $namespace = static::___getEloquentNamespace();
-    $class = static::___getEloquentBaseClassname();
-
-    $tablemapClass = static::TABLE_MAP;
-    $tablemap = new $tablemapClass;
-    $behaviors = $tablemap->getBehaviors();
-
-    $table = constant($tablemapClass . \'::TABLE_NAME\');
-    $primaryKey = array_keys($tablemap->getPrimaryKeys())[0];
-    $timestamps = in_array(\'timestampable\', array_keys($behaviors));
-
-    $data = "<?php
-namespace ${namespace};
-
-class ${class} extends \\Illuminate\\Database\\Eloquent\\Model
-{
-    protected \$___model;
-
-    protected \$table = \'${table}\';
-
-    protected \$primaryKey = \'${primaryKey}\';
-
-";
-
-            if (!$timestamps) {
-                $data .= "
-    protected \\$timestamps = false;
-
-
-";
-            }
-
-            $r = new \ReflectionClass(static::class);
-
-            $attribute = $r->getProperty(\'fillable\');
-            $classname = static::class;
-            $instance = new $classname;
-
-            if ($attribute && ($attribute->isProtected() ||  $attribute->isPublic())) {
-                $data .= "    protected \$fillable = [\\n";
-                foreach ($instance->fillable as $index => $field) {
-                    $data .= "            \'$field\',\\n";
-                }
-                $data .= "        ];";
-            }
-
-            $thisClass = \'\\\\\'. static::class;
-
-            $data .= "
-
-    public function /* */__construct()
-    {
-        \\$args = func_get_args();
-        if (isset(\$args[1])) {
-            if (\\$args[1] instanceof ${thisClass}) {
-               \\$this->___model = \\$args[0];
-            } else {
-               parent::__construct(\\$args[0]);
-            }
-        } else {
-            parent::__construct();
-        }
-        \\$this->___model = \\$this->___model ?: new ${thisClass}(\\$this);
-    }
-
-    public function setRawAttributes(array \\$attributes, \\$sync = false)
-    {
-        parent::setRawAttributes(\\$attributes, \\$sync);
-        \\$this->___model->___fill(\\$attributes);
-    }
-
-    public function ___setModel(\\\\${classname} \\$model)
-    {
-        \\$this->___model = \\$model;
-    }
-
-    public function setAttribute(\\$key, \\$value)
-    {
-        \\$this->___model->\\$key = \\$value;
-    }
-
-    public function getAttribute(\\$key)
-    {
-        return \\$this->___model->\\$key;
-    }
-
-    public function save(array \\$options = [])
-    {
-        \\$saved = parent::save(\\$options);
-        if (\\$daved && \\$this->___model) {
-            \\$this->___model->setNew(false);
-            \\$this->___model->resetModified();
-            \\$args = func_get_args();
-            \\$this->___model->reload(\'false\', isset(\\$args[1]) ?: null);
-        }
-    }
-
-    public function delete()
-    {
-        if (\\$this->___model) {
-            \\$args = func_get_args();
-            \\$this->___model->delete(isset(\\$args[1]) ?: null);
-        }
-        \\$this->exists = false;
-    }
-
-    public function  /* */__call(\\$name, \\$params)
-    {
-        if (\\$this->___model && method_exists(\\$this->___model, \\$name)) {
-            return call_user_func_array([ \\$this->___model, \\$name ], \\$params);
-        } else {
-            throw new PropelEloquentException(\"Method \'\\$name\' does not exist.\");
-        }
-    }
-}
-";
-
-    return preg_replace(\'/\n    /\', "\n", $data);
-}
-
-/**
- *
- * @return string
- */
-protected static function ___getEloquentFilename($hash)
-{
-    return storage_path(\'framework/cache\') . \'/\' . $hash . \'.php\';
-}
-
-/**
- *
- * @return string
- * @throws PropelEloquentException
- */
-protected static function ___generateEloquentFile()
-{
-    $data = static::___generateEloquent();
-    $hash = md5($data);
-
-    $filename = static::___getEloquentFilename($hash);
-
-    if (!file_exists($filename) || is_writable($filename)) {
-        $file = touch($filename);
-
-        if (!$file) {
-            throw new PropelEloquentException("Can\'t create file \'$filename\'");
-        }
-
-        $loader = require base_path(\'vendor/autoload.php\');
-        $loader->addClassMap([ static::___getEloquentClassname() => $filename ]);
-
-        if (!$file) {
-            throw new PropelEloquentException("Can\'t create file \'$filename\'");
-        }
-
-        file_put_contents($filename, $data);
-    }
-
-    return $filename;
-}
-
-protected static function ___loadEloquentFile()
-{
-    if (!self::$___eloquentClassLoaded) {
-        $filename = static::___generateEloquentFile();
-        require_once $filename;
-        self::$___eloquentClassLoaded = true;
+    $r = new \ReflectionClass($this);
+    if ($r->getProperty(\'fillable\')) {
+        return $this->fillable;
     }
 }
 
 /**
  *
- * @throws PropelEloquentException
+ * @throws \Exception
  * @return \Illuminate\Database\Eloquent\Model
  */
 protected function ___loadEloquentClass($args = null, $connection = null)
 {
     if (!$this->___model) {
-        static::___loadEloquentFile();
-        if (!class_exists($this->___getEloquentClassname())) {
-            throw new PropelEloquentException("Class {$this->___getEloquentClassname()} was not loaded from file \'$filename\'");
-        }
-        $classname = $this->___getEloquentClassname();
-        $this->___model = new $classname($this);
+        $this->___model = new \\' . $this->getEloquentFullClassName() . '();
         if (is_array($args)) {
             $this->___model->fill($args, $connection);
         }
@@ -256,7 +70,7 @@ protected function ___loadEloquentClass($args = null, $connection = null)
  *
  * @param string \$name
  * @param array \$params
- * @throws PropelEloquentException
+ * @throws \Exception
  * @return \Illuminate\Database\Eloquent\Collection|boolean
  */
 public function ___callEloquent($name, $params)
@@ -264,7 +78,7 @@ public function ___callEloquent($name, $params)
     switch ($name) {
         case \'hydrate\':
             if (isset($params[1]) && $params[1] instanceof EloquentCollection) {
-                return $this->___loadEloquentClass->hydrate($params[0], $params[1]);
+                return $this->___loadEloquentClass()->hydrate($params[0], $params[1]);
             }
             break;
         case \'save\':
@@ -272,7 +86,7 @@ public function ___callEloquent($name, $params)
                 return $this->___model->save($params[0]);
             }
     }
-    throw new PropelEloquentException();
+    throw new \Exception();
 }
 
 /**
@@ -282,14 +96,14 @@ public function ___callEloquent($name, $params)
  */
 public static function __callstatic($name, $params)
 {
-    static::___loadEloquentFile();
-
-    $classname = self::___getEloquentClassname();
-    $instance = new $classname;
-
-    return call_user_func_array([ $instance, $name ], $params);
+    $instance = new \\' . $this->getEloquentFullClassName() . '();
+    return call_user_func_array([ $instance, $name ] , $params);
 }
 
+/**
+ *
+ * @param array $attributtes
+ */
 public function ___fill(array $attributes = [])
 {
     $totallyGuarded = $this->___model && $this->___model->totallyGuarded();
@@ -347,12 +161,10 @@ public function __get($key)
         }
     }
     if (!property_exists($this, $key)) {
-        throw new PropelEloquentException("Property \'$key\' does not exist.");
+        throw new \Exception("Property \'$key\' does not exist.");
     }
     return $this->$key;
 }
-
-
 ';
     }
 
@@ -392,5 +204,110 @@ EOD;
                 $matches[0] . $matches[1] . "\n" . $constructor;
         }
         $script = preg_replace($pattern, $replacement, $script);
+
+        $namespace = head(explode('\\', $this->getTableNameSpace()));
+        $class = $this->getTableClassName();
+
+        $behaviors = [];
+        foreach ($this->getTable()->getBehaviors() as $behavior) {
+            array_push($behaviors, $behavior->getName());
+        }
+
+        $table = $this->getTable()->getName();
+        $primaryKey = $this->getTable()->getPrimaryKey()[0]->getName();
+        $timestamps = in_array('timestampable', array_keys($behaviors));
+
+        $script .= "
+namespace ${namespace};
+
+class ${class} extends \\Illuminate\\Database\\Eloquent\\Model
+{
+    protected \$___model;
+
+    protected \$table = '${table}';
+
+    protected \$primaryKey = '${primaryKey}';
+";
+
+        if (!$timestamps) {
+            $script .= "
+    protected \$timestamps = false;
+
+";
+        }
+
+        $script .= "
+    public function __construct()
+    {
+        \$args = func_get_args();
+        if (isset(\$args[1])) {
+            if (\$args[1] instanceof {$this->getTableFullClassName()}) {
+               \$this->___model = \$args[0];
+            } else {
+               parent::__construct(\$args[0]);
+            }
+        } else {
+            parent::__construct();
+        }
+        \$this->___model = \$this->___model ?: new \\{$this->getTableFullClassName()}(\$this);
+
+        \$r = new \ReflectionClass(get_class(\$this->___model));
+        if (\$r->getProperty('fillable')) {
+            \$this->fillable = \$this->___model->___getFillable();
+        }
+    }
+
+    public function setRawAttributes(array \$attributes, \$sync = false)
+    {
+        parent::setRawAttributes(\$attributes, \$sync);
+        \$this->___model->___fill(\$attributes);
+    }
+
+    public function ___setModel(\\${namespace}\\${class} \$model)
+    {
+        \$this->___model = \$model;
+    }
+
+    public function setAttribute(\$key, \$value)
+    {
+        \$this->___model->\$key = \$value;
+    }
+
+    public function getAttribute(\$key)
+    {
+        return \$this->___model->\$key;
+    }
+
+    public function save(array \$options = [])
+    {
+        \$saved = parent::save(\$options);
+        if (\$saved && \$this->___model) {
+            \$this->___model->setNew(false);
+            \$this->___model->resetModified();
+            \$args = func_get_args();
+            \$this->___model->reload('false', isset(\$args[1]) ?: null);
+        }
+    }
+
+    public function delete()
+    {
+        if (\$this->___model) {
+            \$args = func_get_args();
+            \$this->___model->delete(isset(\$args[1]) ?: null);
+        }
+        \$this->exists = false;
+    }
+
+    public function  __call(\$name, \$params)
+    {
+        if (\$this->___model && method_exists(\$this->___model, \$name)) {
+            return call_user_func_array([ \$this->___model, \$name ], \$params);
+        } else {
+            throw new \Exception(\"Method '\$name' does not exist.\");
+        }
+    }
+}
+";
+
     }
 }
