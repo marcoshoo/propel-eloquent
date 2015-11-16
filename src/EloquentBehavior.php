@@ -134,7 +134,7 @@ public function __set($key, $value)
 {
     $method = \'set\' . $key;
     if (method_exists($this, $method)) {
-        $r = new \ReflectionProperty($this, $method);
+        $r = new \ReflectionMethod($this, $method);
         if ($r && $r->isPublic()) {
             $r->invoke($this, $value);
         } else {
@@ -217,16 +217,43 @@ EOD;
         $primaryKey = $this->getTable()->getPrimaryKey()[0]->getName();
         $timestamps = in_array('timestampable', array_keys($behaviors));
 
+        function fmt($s) {
+            return str_replace('{:nlw:}', '\n', str_replace('\n', "\n", str_replace('\\\\n', '{:nlw:}', $s)));
+        }
+
+        $uses =
+            $this->getParameter('uses')
+                ? "\nuse " . implode(";\nuse ",explode(',',$this->getParameter('uses'))) . ";\n" : '';
+
+        $interfaces =
+            $this->getParameter('interfaces')
+                ? 'implements ' . fmt($this->getParameter('interfaces'))
+                : '';
+
+        $traits = $this->getParameter('traits')
+                ? 'use ' . fmt($this->getParameter('traits')) . ";\n\n    "
+                : '';
+
+        $properties =
+            $this->getParameter('properties')
+                ? ''. fmt($this->getParameter('properties')) . "\n\n    "
+                : '';
+
+        $methods =
+            $this->getParameter('methods')
+                ? "\n    " . fmt($this->getParameter('methods')) . "\n"
+                : '';
+
         $script .= "
-namespace ${namespace};
-
-class ${class} extends \\Illuminate\\Database\\Eloquent\\Model
+namespace {$namespace};
+{$uses}
+class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
 {
-    protected \$___model;
+    {$traits}{$properties}protected \$___model;
 
-    protected \$table = '${table}';
+    protected \$table = '{$table}';
 
-    protected \$primaryKey = '${primaryKey}';
+    protected \$primaryKey = '{$primaryKey}';
 ";
 
         if (!$timestamps) {
@@ -240,8 +267,8 @@ class ${class} extends \\Illuminate\\Database\\Eloquent\\Model
     public function __construct()
     {
         \$args = func_get_args();
-        if (isset(\$args[1])) {
-            if (\$args[1] instanceof {$this->getTableFullClassName()}) {
+        if (isset(\$args[0])) {
+            if (\$args[0] instanceof {$this->getTableFullClassName()}) {
                \$this->___model = \$args[0];
             } else {
                parent::__construct(\$args[0]);
@@ -257,13 +284,18 @@ class ${class} extends \\Illuminate\\Database\\Eloquent\\Model
         }
     }
 
+    public function getPropel()
+    {
+        return \$this->___model;
+    }
+
     public function setRawAttributes(array \$attributes, \$sync = false)
     {
         parent::setRawAttributes(\$attributes, \$sync);
         \$this->___model->___fill(\$attributes);
     }
 
-    public function ___setModel(\\${namespace}\\${class} \$model)
+    public function ___setModel(\\{$namespace}\\{$class} \$model)
     {
         \$this->___model = \$model;
     }
@@ -285,7 +317,7 @@ class ${class} extends \\Illuminate\\Database\\Eloquent\\Model
             \$this->___model->setNew(false);
             \$this->___model->resetModified();
             \$args = func_get_args();
-            \$this->___model->reload('false', isset(\$args[1]) ?: null);
+            \$this->___model->reload('false', isset(\$args[1]) ? \$args[1] : null);
         }
     }
 
@@ -293,7 +325,7 @@ class ${class} extends \\Illuminate\\Database\\Eloquent\\Model
     {
         if (\$this->___model) {
             \$args = func_get_args();
-            \$this->___model->delete(isset(\$args[1]) ?: null);
+            \$this->___model->delete(isset(\$args[1]) ? \$args[1] : null);
         }
         \$this->exists = false;
     }
@@ -306,7 +338,7 @@ class ${class} extends \\Illuminate\\Database\\Eloquent\\Model
             throw new \Exception(\"Method '\$name' does not exist.\");
         }
     }
-}
+{$methods}}
 ";
 
     }
