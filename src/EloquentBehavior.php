@@ -42,11 +42,27 @@ protected $___model;
  */
 protected $___args;
 
+/**
+ *
+ * @return array
+ */
 public function ___getFillable()
 {
     $r = new \ReflectionClass($this);
     if ($r->getProperty(\'fillable\')) {
         return $this->fillable;
+    }
+}
+
+/**
+ *
+ * @return array
+ */
+public function ___getGuarded()
+{
+    $r = new \ReflectionClass($this);
+    if ($r->getProperty(\'guarded\')) {
+        return $this->guarded;
     }
 }
 
@@ -96,8 +112,7 @@ public function ___callEloquent($name, $params)
  */
 public static function __callstatic($name, $params)
 {
-    $instance = new \\' . $this->getEloquentFullClassName() . '();
-    return call_user_func_array([ $instance, $name ] , $params);
+    return call_user_func_array("' . $this->getEloquentFullClassName() . '::$name" , $params);
 }
 
 /**
@@ -267,24 +282,33 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
     public function __construct()
     {
         \$args = func_get_args();
+        if (isset(\$args[0]) && \$args[0] instanceof {$this->getTableFullClassName()}) {
+            \$args = null;
+            \$this->___model = \$args[0];
+        } else {
+            \$this->___model = \$this->___model ?: new \Quotem\Models\User(\$this);
+        }
+        \$this->___init();
         if (isset(\$args[0])) {
-            if (\$args[0] instanceof {$this->getTableFullClassName()}) {
-               \$this->___model = \$args[0];
-            } else {
-               parent::__construct(\$args[0]);
-            }
+            parent::__construct(\$args[0]);
         } else {
             parent::__construct();
         }
-        \$this->___model = \$this->___model ?: new \\{$this->getTableFullClassName()}(\$this);
+    }
+
+    public function ___init()
+    {
 
         \$r = new \ReflectionClass(get_class(\$this->___model));
-        if (\$r->getProperty('fillable')) {
+        if (\$r->hasProperty('fillable')) {
             \$this->fillable = \$this->___model->___getFillable();
+        }
+        if (\$r->hasProperty('guarded')) {
+            \$this->guarded = \$this->___model->___getGuarded();
         }
     }
 
-    public function getPropel()
+    public function __getPropel()
     {
         return \$this->___model;
     }

@@ -1,3 +1,8 @@
 /vendor
 composer.phar
 composer.lock
+
+#eclipse
+.project
+.buildpath
+/.settings
