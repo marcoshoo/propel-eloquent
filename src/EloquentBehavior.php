@@ -42,6 +42,11 @@ protected $___model;
  */
 protected $___args;
 
+/*
+ * @var boolean
+ */
+public $___alreadyInSet = false;
+
 /**
  *
  * @return array
@@ -74,7 +79,7 @@ public function ___getGuarded()
 protected function ___loadEloquentClass($args = null, $connection = null)
 {
     if (!$this->___model) {
-        $this->___model = new \\' . $this->getEloquentFullClassName() . '();
+        $this->___model = new \\' . $this->getEloquentFullClassName() . '($this);
         if (is_array($args)) {
             $this->___model->fill($args, $connection);
         }
@@ -147,16 +152,19 @@ public function ___fill(array $attributes = [])
  */
 public function __set($key, $value)
 {
-    $method = \'set\' . $key;
-    if (method_exists($this, $method)) {
-        $r = new \ReflectionMethod($this, $method);
-        if ($r && $r->isPublic()) {
-            $r->invoke($this, $value);
-        } else {
-            $this->___loadEloquentClass()->setAttribute($key, $value);
+    if (!$this->___alreadyInSet) {
+        $this->___alreadyInSet = true;
+        $this->$key = $value;
+        $method = \'set\' . $key;
+        $eloquent = $this->___model;
+        if (method_exists($this, $method)) {
+            $r = new \ReflectionMethod($this, $method);
+            if ($r->isPublic()) {
+                $r->invoke($this, $value);
+            }
         }
-    } else {
-        $this->___loadEloquentClass()->setAttribute($key, $value);
+        $eloquent->$key = $this->$key;
+        $this->___alreadyInSet = false;
     }
 }
 
@@ -168,17 +176,18 @@ public function __set($key, $value)
  */
 public function __get($key)
 {
-    $method = \'get\' . $key;
-    if (method_exists($this, $method)) {
-        $r = new \ReflectionProperty($this, $method);
-        if ($r && $r->isPublic()) {
-            return $r->invoke($this);
+    if (!isset($this->$key)) {
+        return $this->___model->getAttribute($key);
+    } else {
+        $r = new \ReflectionClass($this);
+        if ($r->hasProperty($key)) {
+            $r = $r->getProperty($key);
+            if ($r->isPublic()) {
+                return $this->$key;
+            }
         }
     }
-    if (!property_exists($this, $key)) {
-        throw new \Exception("Property \'$key\' does not exist.");
-    }
-    return $this->$key;
+    throw new \Exception(\'Property is protected or private.\');
 }
 ';
     }
@@ -279,6 +288,12 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
         }
 
         $script .= "
+
+    /*
+     * @var boolean
+     */
+    public \$___alreadyInSet = false;
+
     public function __construct()
     {
         \$args = func_get_args();
@@ -298,7 +313,6 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
 
     public function ___init()
     {
-
         \$r = new \ReflectionClass(get_class(\$this->___model));
         if (\$r->hasProperty('fillable')) {
             \$this->fillable = \$this->___model->___getFillable();
@@ -324,20 +338,29 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
         \$this->___model = \$model;
     }
 
-    public function setAttribute(\$key, \$value)
+    public function _set(\$key, \$value)
     {
-        \$this->___model->\$key = \$value;
-    }
-
-    public function getAttribute(\$key)
-    {
-        return \$this->___model->\$key;
+        if (!\$this->___alreadyInSet) {
+            \$this->___alreadyInSet = true;
+            if (!\$this->___model->___alreadyInSet) {
+                \$this->___model->\$key = \$value;
+            } else {
+                parent::setAttribute(\$key, \$value);
+            }
+            \$this->___alreadyInSet = false;
+        } else {
+            parent::setAttribute(\$key, \$value);
+        }
     }
 
     public function save(array \$options = [])
     {
         \$saved = parent::save(\$options);
         if (\$saved && \$this->___model) {
+            \$pk = \$this->primaryKey;
+            \$this->___alreadyInSet = true;
+            \$this->___model->\$pk = \$this->\$pk;
+            \$this->___alreadyInSet = false;
             \$this->___model->setNew(false);
             \$this->___model->resetModified();
             \$args = func_get_args();
