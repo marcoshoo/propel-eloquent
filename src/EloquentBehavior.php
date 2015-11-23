@@ -36,12 +36,6 @@ class EloquentBehavior extends Behavior
  */
 protected $___model;
 
-/**
- *
- * @var array
- */
-protected $___args;
-
 /*
  * @var boolean
  */
@@ -49,26 +43,19 @@ public $___alreadyInSet = false;
 
 /**
  *
- * @return array
  */
-public function ___getFillable()
+public function ___getEloquentProperty($property, \\' . $this->getTableFullClassName() . ' $model)
 {
-    $r = new \ReflectionClass($this);
-    if ($r->getProperty(\'fillable\')) {
-        return $this->fillable;
+    $m = $this->___loadEloquentClass();
+    if ($model !== $m) {
+        $r1 = new \ReflectionClass($m);
+        $r1 = $r1->getParentClass();
+        $r2 = new \ReflectionClass($this);
+        if ($r1->hasProperty($property) && $r2->hasProperty($property)) {
+            return $this->$property;
+        }
     }
-}
-
-/**
- *
- * @return array
- */
-public function ___getGuarded()
-{
-    $r = new \ReflectionClass($this);
-    if ($r->getProperty(\'guarded\')) {
-        return $this->guarded;
-    }
+    throw new \Exception("Property does not exist.");
 }
 
 /**
@@ -139,7 +126,6 @@ public function ___fill(array $attributes = [])
         }
     }
     $this->resetModified();
-    $this->setNew(false);
     $this->setDeleted(false);
 }
 
@@ -204,13 +190,13 @@ public function __get($key)
         $script = preg_replace($pattern, $replacement, $script);
 
         $constructor = <<<EOD
-        \$this->___args = func_get_args();
-        if (isset(\$this->___args[0])) {
-            if (\$this->___args[0] instanceof \Illuminate\Database\Eloquent\Model) {
-                \$this->___fill(\$this->___args[0]->getAttributes());
-                \$this->___model = \$this->___args[0];
-            } elseif (is_array(\$this->___args)) {
-                \$this->___loadEloquentClass(\$this->___args);
+        \$args = func_get_args();
+        if (isset(\$args[0])) {
+            if (\$args[0] instanceof \Illuminate\Database\Eloquent\Model) {
+                \$this->___fill(\$args[0]->getAttributes());
+                \$this->___model = \$args[0];
+            } elseif (is_array(\$args)) {
+                \$this->___loadEloquentClass(\$args);
             }
         }
 EOD;
@@ -246,25 +232,26 @@ EOD;
         }
 
         $uses =
-            $this->getParameter('uses')
+            isset($this->parameters['uses'])
                 ? "\nuse " . implode(";\nuse ",explode(',',$this->getParameter('uses'))) . ";\n" : '';
 
         $interfaces =
-            $this->getParameter('interfaces')
+            isset($this->parameters['interfaces'])
                 ? 'implements ' . fmt($this->getParameter('interfaces'))
                 : '';
 
-        $traits = $this->getParameter('traits')
+        $traits =
+            isset($this->parameters['traits'])
                 ? 'use ' . fmt($this->getParameter('traits')) . ";\n\n    "
                 : '';
 
         $properties =
-            $this->getParameter('properties')
+            isset($this->parameters['properties'])
                 ? ''. fmt($this->getParameter('properties')) . "\n\n    "
                 : '';
 
         $methods =
-            $this->getParameter('methods')
+            isset($this->parameters['methods'])
                 ? "\n    " . fmt($this->getParameter('methods')) . "\n"
                 : '';
 
@@ -311,14 +298,16 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
         }
     }
 
-    public function ___init()
+    protected function ___init()
     {
-        \$r = new \ReflectionClass(get_class(\$this->___model));
-        if (\$r->hasProperty('fillable')) {
-            \$this->fillable = \$this->___model->___getFillable();
-        }
-        if (\$r->hasProperty('guarded')) {
-            \$this->guarded = \$this->___model->___getGuarded();
+        \$r1 = new \ReflectionClass(\$this);
+        \$r1 = \$r1->getParentClass();
+        \$r2 = new \ReflectionClass(\$this->___model);
+        foreach (\$r1->getProperties() as \$p) {
+            \$n = \$p->getName();
+            if (\$r2->hasProperty(\$n)) {
+                \$this->\$n = \$this->___model->___getEloquentProperty(\$n, \$this->___model);
+            }
         }
     }
 
