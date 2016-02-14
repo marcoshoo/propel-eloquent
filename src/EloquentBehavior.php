@@ -195,9 +195,11 @@ public function __get($key)
             if (\$args[0] instanceof \Illuminate\Database\Eloquent\Model) {
                 \$this->___fill(\$args[0]->getAttributes());
                 \$this->___model = \$args[0];
-            } elseif (is_array(\$args)) {
+            } elseif (is_array(\$args[0])) {
                 \$this->___loadEloquentClass(\$args);
             }
+        } else {
+           \$this->___loadEloquentClass(\$args);
         }
 EOD;
 
@@ -284,14 +286,14 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
     public function __construct()
     {
         \$args = func_get_args();
-        if (isset(\$args[0]) && \$args[0] instanceof {$this->getTableFullClassName()}) {
-            \$args = null;
+        if (isset(\$args[0]) && \$args[0] instanceof \\{$this->getTableFullClassName()}) {
             \$this->___model = \$args[0];
+            \$args = null;
         } else {
             \$this->___model = \$this->___model ?: new \Quotem\Models\User(\$this);
         }
-        \$this->___init();
         if (isset(\$args[0])) {
+            \$this->___init();
             parent::__construct(\$args[0]);
         } else {
             parent::__construct();
