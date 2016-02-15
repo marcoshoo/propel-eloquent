@@ -196,10 +196,10 @@ public function __get($key)
                 \$this->___fill(\$args[0]->getAttributes());
                 \$this->___model = \$args[0];
             } elseif (is_array(\$args[0])) {
-                \$this->___loadEloquentClass(\$args);
+                \$this->___loadEloquentClass(\$args[0]);
             }
         } else {
-           \$this->___loadEloquentClass(\$args);
+           \$this->___loadEloquentClass(\$args[0]);
         }
 EOD;
 
