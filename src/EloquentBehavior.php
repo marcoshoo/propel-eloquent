@@ -199,7 +199,7 @@ public function __get($key)
                 \$this->___loadEloquentClass(\$args[0]);
             }
         } else {
-           \$this->___loadEloquentClass(\$args[0]);
+           \$this->___loadEloquentClass();
         }
 EOD;
 
