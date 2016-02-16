@@ -44,18 +44,14 @@ public $___alreadyInSet = false;
 /**
  *
  */
-public function ___getEloquentProperty($property, \\' . $this->getTableFullClassName() . ' $model)
+public function ___getEloquentProperty($property)
 {
-    $m = $this->___loadEloquentClass();
-    if ($model !== $m) {
-        $r1 = new \ReflectionClass($m);
-        $r1 = $r1->getParentClass();
-        $r2 = new \ReflectionClass($this);
-        if ($r1->hasProperty($property) && $r2->hasProperty($property)) {
-            return $this->$property;
-        }
+    $r1 = new \ReflectionClass(\'\\' . $this->getEloquentFullClassName() . '\');
+    $r1 = $r1->getParentClass();
+    $r2 = new \ReflectionClass($this);
+    if ($r1->hasProperty($property) && $r2->hasProperty($property)) {
+        return $this->$property;
     }
-    throw new \Exception("Property does not exist.");
 }
 
 /**
@@ -63,12 +59,12 @@ public function ___getEloquentProperty($property, \\' . $this->getTableFullClass
  * @throws \Exception
  * @return \Illuminate\Database\Eloquent\Model
  */
-protected function ___loadEloquentClass($args = null, $connection = null)
+protected function ___loadEloquentClass($args = null)
 {
     if (!$this->___model) {
         $this->___model = new \\' . $this->getEloquentFullClassName() . '($this);
         if (is_array($args)) {
-            $this->___model->fill($args, $connection);
+            $this->___model->fill($args);
         }
     }
     return $this->___model;
@@ -292,8 +288,8 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
         } else {
             \$this->___model = \$this->___model ?: new \Quotem\Models\User(\$this);
         }
+        \$this->___init();
         if (isset(\$args[0])) {
-            \$this->___init();
             parent::__construct(\$args[0]);
         } else {
             parent::__construct();
@@ -308,7 +304,7 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
         foreach (\$r1->getProperties() as \$p) {
             \$n = \$p->getName();
             if (\$r2->hasProperty(\$n)) {
-                \$this->\$n = \$this->___model->___getEloquentProperty(\$n, \$this->___model);
+                \$this->\$n = \$this->___model->___getEloquentProperty(\$n);
             }
         }
     }
