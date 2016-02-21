@@ -44,6 +44,14 @@ public $___alreadyInSet = false;
 /**
  *
  */
+public function getEloquentModel()
+{
+    return $this->___model;
+}
+
+/**
+ *
+ */
 public function ___getEloquentProperty($property)
 {
     $r1 = new \ReflectionClass(\'\\' . $this->getEloquentFullClassName() . '\');
@@ -106,8 +114,9 @@ public static function __callstatic($name, $params)
 /**
  *
  * @param array $attributtes
+ * @param boolean $resetModified
  */
-public function ___fill(array $attributes = [])
+public function ___fill(array $attributes = [], $resetModified = false)
 {
     $totallyGuarded = $this->___model && $this->___model->totallyGuarded();
     foreach ($attributes as $key => $value) {
@@ -121,8 +130,10 @@ public function ___fill(array $attributes = [])
             $this->$key = $value;
         }
     }
-    $this->resetModified();
-    $this->setDeleted(false);
+    if ($resetModified) {
+        $this->resetModified();
+        $this->setDeleted(false);
+    }
 }
 
 /**
@@ -136,8 +147,8 @@ public function __set($key, $value)
 {
     if (!$this->___alreadyInSet) {
         $this->___alreadyInSet = true;
-        $this->$key = $value;
-        $method = \'set\' . $key;
+        $name = ' . $this->getTable()->getPhpName() . 'TableMap::getTableMap()->getColumn($key)->getPhpName();
+        $method = \'set\' . $name;
         $eloquent = $this->___model;
         if (method_exists($this, $method)) {
             $r = new \ReflectionMethod($this, $method);
@@ -145,7 +156,7 @@ public function __set($key, $value)
                 $r->invoke($this, $value);
             }
         }
-        $eloquent->$key = $this->$key;
+        $eloquent->setAttribute($key, $value);
         $this->___alreadyInSet = false;
     }
 }
@@ -158,29 +169,102 @@ public function __set($key, $value)
  */
 public function __get($key)
 {
-    if (!isset($this->$key)) {
-        return $this->___model->getAttribute($key);
-    } else {
-        $r = new \ReflectionClass($this);
-        if ($r->hasProperty($key)) {
-            $r = $r->getProperty($key);
-            if ($r->isPublic()) {
-                return $this->$key;
-            }
-        }
-    }
-    throw new \Exception(\'Property is protected or private.\');
+    return $this->___model->getAttribute($key);
 }
 ';
     }
 
     public function objectFilter(&$script)
     {
+        foreach ($this->getTable()->getColumns() as $col) {
+
+            $col = $col->getName();
+
+            $script = preg_replace("/protected( +)\\\${$col};/", "protected \$column_{$col};", $script);
+
+            $name = $this->getTable()->getColumn($col)->getPhpName();
+
+            foreach ([' ', '( +)?\)', '( +)?=', '( +)?;', '( +)?,', '->'] as $search) {
+
+                $matches = null;
+                $pattern = "/\\\$this->({$col})(${search})/";
+                preg_match($pattern, $script, $matches);
+
+                if (count($matches) > 2) {
+                    $replacement = '$this->column_' . $matches[1] . $matches [2];
+                    $script = preg_replace($pattern, $replacement, $script);
+                }
+
+            }
+
+            $matches = null;
+            $pattern = "/(public function( +)?get{$name}\()/";
+            preg_match($pattern, $script, $matches);
+
+            $replacement = <<<EOD
+public function get{$name}()
+    {
+        return \$this->___getColumn{$name}();
+    }
+
+    /**
+     * Get the [{$col}] column value.
+     *
+     * @return boolean
+     */
+    protected function ___getColumn{$name}(
+EOD;
+
+            $script = preg_replace($pattern,$replacement, $script);
+
+            $matches = null;
+            $pattern = "/(public function( +)?set{$name}\(\\\$v\)( +)?\n?( +)?{)(( +)?(.*)\/\/( +)set{$name})/sm";
+            preg_match($pattern, $script, $matches);
+
+            if (count($matches) > 8) {
+
+                $replacement = <<<EOD
+public function set{$name}(\$v)
+    {
+        return \$this->___setColumn{$name}(\$v);
+    }
+
+    /**
+     * Set the value of [{$col}] column.
+     *
+     * @param string \$v new value
+     * @return \$this|{$this->getTableFullClassName()} The current object (for fluent API support)
+     */
+    protected function ___setColumn{$name}(\$v)
+    {
+        \$this->___alreadyInSet = true;
+        \$this->___model->{$col} = \$v;
+        \$this->___alreadyInSet = false;
+{$matches[5]}
+EOD;
+
+                $script = preg_replace($pattern, $replacement, $script);
+            }
+
+        }
+
+        $matches = null;
+        $pattern = '/(( +)?(\$this->ensureConsistency\(\);)\n?( +)?}( +)?\n)/';
+        preg_match($pattern, $script, $matches);
+
+        $replacement = $matches[0] . "\n" . $matches[4] . '$this->___model->forceFill($this->toArray(TableMap::TYPE_FIELDNAME));' . "\n";
+
+        $script = preg_replace($pattern, $replacement, $script);
+
         $matches = null;
         $pattern = '/( +)throw new BadMethodCallException\(.*\);( +)?\n?( +)?/';
         preg_match($pattern, $script, $matches);
         $replacement =
-            $matches[1] . "try{\n" . $matches[1] . "    call_user_func_array([ \$this, '___callEloquent' ], func_get_args());\n" .
+            $matches[1] . "\\\$columnName = substr(\\\$name, 3);\n\n" .
+            $matches[1] . "if (0 === strpos(\\\$name, 'set') && method_exists(\\\$this, 'set' . \\\$columnName)) {\n" .
+            $matches[1] . "    return call_user_func_array([\\\$this, 'set' . \\\$columnName], \\\$params);\n" .
+            $matches[1] . "}\n\n" .
+            $matches[1] . "try{\n" . $matches[1] . "    return call_user_func_array([ \$this, '___callEloquent' ], func_get_args());\n" .
             $matches[1] . "} catch(\Exception \$e) {\n    " . $matches[0] . "    }\n". $matches[3];
 
         $script = preg_replace($pattern, $replacement, $script);
@@ -189,7 +273,7 @@ public function __get($key)
         \$args = func_get_args();
         if (isset(\$args[0])) {
             if (\$args[0] instanceof \Illuminate\Database\Eloquent\Model) {
-                \$this->___fill(\$args[0]->getAttributes());
+                \$this->___fill(\$args[0]->getAttributes(), true);
                 \$this->___model = \$args[0];
             } elseif (is_array(\$args[0])) {
                 \$this->___loadEloquentClass(\$args[0]);
@@ -309,15 +393,10 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
         }
     }
 
-    public function __getPropel()
-    {
-        return \$this->___model;
-    }
-
     public function setRawAttributes(array \$attributes, \$sync = false)
     {
         parent::setRawAttributes(\$attributes, \$sync);
-        \$this->___model->___fill(\$attributes);
+        \$this->___model->___fill(\$attributes, true);
     }
 
     public function ___setModel(\\{$namespace}\\{$class} \$model)
@@ -338,6 +417,17 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
         } else {
             parent::setAttribute(\$key, \$value);
         }
+    }
+
+    public function setAttribute(\$key, \$value)
+    {
+        if (!\$this->___alreadyInSet) {
+            \$this->___alreadyInSet = true;
+            parent::setAttribute(\$key, \$value);
+            \$this->___model->\$key = \$value;
+            \$this->___alreadyInSet = false;
+        }
+        return \$this;
     }
 
     public function save(array \$options = [])
