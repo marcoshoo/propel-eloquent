@@ -97,8 +97,14 @@ public function ___callEloquent($name, $params)
             if (isset($params[0]) && is_array($params[0])) {
                 return $this->___model->save($params[0]);
             }
+            break;
+        default:
+            $eloquent = $this->___loadEloquentClass();
+            if ($eloquent) {
+                return call_user_func_array([ $eloquent, $name ], $params);
+            }
     }
-    throw new \Exception();
+    throw new \Exception(\'Invalid method\');
 }
 
 /**
@@ -115,13 +121,14 @@ public static function __callstatic($name, $params)
  *
  * @param array $attributtes
  * @param boolean $resetModified
- */
-public function ___fill(array $attributes = [], $resetModified = false)
+ * @param boolean $force
+*/
+public function ___fill(array $attributes = [], $resetModified = false, $force = false)
 {
-    $totallyGuarded = $this->___model && $this->___model->totallyGuarded();
+    $totallyGuarded = !$force && $this->___model && $this->___model->totallyGuarded();
     foreach ($attributes as $key => $value) {
         if ($totallyGuarded) {
-            throw new \Illuminate\Database\EloquentException\MassAssignmentException($key);
+            throw new \Illuminate\Database\Eloquent\MassAssignmentException($key);
         }
         $method = \'set\' . $key;
         if (method_exists($this, $method)) {
@@ -134,6 +141,18 @@ public function ___fill(array $attributes = [], $resetModified = false)
         $this->resetModified();
         $this->setDeleted(false);
     }
+}
+
+/**
+ * Fill the model with an array of attributes. Force mass assignment.
+ *
+ * @param  array  $attributes
+ * @param boolean $resetModified
+ * @return $this
+ */
+public function ___forceFill(array $attributes, $resetModified = false)
+{
+    $this->___fill($attributes, $resetModified, true);
 }
 
 /**
@@ -370,7 +389,7 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
             \$this->___model = \$args[0];
             \$args = null;
         } else {
-            \$this->___model = \$this->___model ?: new \Quotem\Models\User(\$this);
+            \$this->___model = \$this->___model ?: new \\{$this->getTableFullClassName()}(\$this);
         }
         \$this->___init();
         if (isset(\$args[0])) {
@@ -396,7 +415,7 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
     public function setRawAttributes(array \$attributes, \$sync = false)
     {
         parent::setRawAttributes(\$attributes, \$sync);
-        \$this->___model->___fill(\$attributes, true);
+        \$this->___model->___fill(\$attributes, true, true);
     }
 
     public function ___setModel(\\{$namespace}\\{$class} \$model)
@@ -459,7 +478,7 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
         if (\$this->___model && method_exists(\$this->___model, \$name)) {
             return call_user_func_array([ \$this->___model, \$name ], \$params);
         } else {
-            throw new \Exception(\"Method '\$name' does not exist.\");
+            return parent::__call(\$name, \$params);
         }
     }
 {$methods}}
