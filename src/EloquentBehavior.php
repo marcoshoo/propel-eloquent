@@ -309,9 +309,9 @@ EOD;
         $primaryKey = $this->getTable()->getPrimaryKey()[0]->getName();
         $timestamps = in_array('timestampable', array_keys($behaviors));
 
-        function fmt($s) {
+        $fmt = function ($s) {
             return str_replace('{:nlw:}', '\n', str_replace('\n', "\n", str_replace('\\\\n', '{:nlw:}', $s)));
-        }
+        };
 
         $uses =
             isset($this->parameters['uses'])
@@ -319,22 +319,22 @@ EOD;
 
         $interfaces =
             isset($this->parameters['interfaces'])
-                ? 'implements ' . fmt($this->getParameter('interfaces'))
+                ? 'implements ' . $fmt($this->getParameter('interfaces'))
                 : '';
 
         $traits =
             isset($this->parameters['traits'])
-                ? 'use ' . fmt($this->getParameter('traits')) . ";\n\n    "
+                ? 'use ' . $fmt($this->getParameter('traits')) . ";\n\n    "
                 : '';
 
         $properties =
             isset($this->parameters['properties'])
-                ? ''. fmt($this->getParameter('properties')) . "\n\n    "
+                ? ''. $fmt($this->getParameter('properties')) . "\n\n    "
                 : '';
 
         $methods =
             isset($this->parameters['methods'])
-                ? "\n    " . fmt($this->getParameter('methods')) . "\n"
+                ? "\n    " . $fmt($this->getParameter('methods')) . "\n"
                 : '';
 
         $script .= "
