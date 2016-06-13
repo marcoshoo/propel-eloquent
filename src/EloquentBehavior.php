@@ -271,7 +271,21 @@ EOD;
         $pattern = '/(( +)?(\$this->ensureConsistency\(\);)\n?( +)?}( +)?\n)/';
         preg_match($pattern, $script, $matches);
 
-        $replacement = $matches[0] . "\n" . $matches[4] . '$this->___model->forceFill($this->toArray(TableMap::TYPE_FIELDNAME));' . "\n";
+        $forceFill = <<<EOD
+\$values = \$this->toArray(TableMap::TYPE_FIELDNAME);
+            \$columns = [];
+            \$r = new \ReflectionClass(self::class);
+
+            foreach (\$values as \$name => \$value) {
+                if (\$r->hasProperty('column_' . \$name)) {
+                    \$columns[\$name] = \$value;
+                }
+            }
+
+            \$this->___model->forceFill(\$columns);
+
+EOD;
+        $replacement = $matches[0] . "\n" . $matches[4] . $forceFill;
 
         $script = preg_replace($pattern, $replacement, $script);
 
