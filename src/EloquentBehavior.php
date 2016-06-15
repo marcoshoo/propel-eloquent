@@ -216,14 +216,17 @@ public function __get($key)
 
             }
 
-            $matches = null;
-            $pattern = "/(public function( +)?get{$name}\()/";
+            $matches = null; //{$name}
+            $pattern = "/(public function( +)?get{$name}\(((\\$\w+) = (.*))?\))/";
             preg_match($pattern, $script, $matches);
 
+            $params = isset($matches[3]) ? $matches[3] : '';
+            $var = isset($matches[4]) ? $matches[4] : '';
+
             $replacement = <<<EOD
-public function get{$name}()
+public function get{$name}({$params})
     {
-        return \$this->___getColumn{$name}();
+        return \$this->___getColumn{$name}({$var});
     }
 
     /**
@@ -231,7 +234,7 @@ public function get{$name}()
      *
      * @return boolean
      */
-    protected function ___getColumn{$name}(
+    protected function ___getColumn{$name}({$params})
 EOD;
 
             $script = preg_replace($pattern,$replacement, $script);

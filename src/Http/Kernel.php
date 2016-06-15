@@ -45,7 +45,3 @@ class Kernel extends HttpKernel
         parent::__construct($app, $router);
     }
 }
-
-
-
-
