@@ -376,7 +376,11 @@ EOD;
         $script .= "
 namespace {$namespace};
 {$uses}
-class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
+
+use Illuminate\\Database\\Eloquent\\Model as EloquentModel;
+use Illuminate\\Database\\Eloquent\\Collection as EloquentCollection;
+
+class {$class} extends EloquentModel {$interfaces}
 {
     {$traits}{$properties}protected \$___model;
 
@@ -433,6 +437,11 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
     {
         parent::setRawAttributes(\$attributes, \$sync);
         \$this->___model->___fill(\$attributes, true, true);
+    }
+
+    public function ___getModel()
+    {
+        return \$this->___model;
     }
 
     public function ___setModel(\\{$namespace}\\{$class} \$model)
@@ -496,6 +505,43 @@ class {$class} extends \\Illuminate\\Database\\Eloquent\\Model {$interfaces}
             return call_user_func_array([ \$this->___model, \$name ], \$params);
         } else {
             return parent::__call(\$name, \$params);
+        }
+    }
+
+    public static function all(\$columns = ['*']) {
+        return self::___static(parent::all(\$columns));
+    }
+
+    public static function __callStatic(\$method, \$parameters)
+    {
+        \$instance = new static;
+
+        return static::___static(call_user_func_array([\$instance, \$method], \$parameters));
+    }
+
+    protected static function ___static(\$res)
+    {
+        \$test = (\$res instanceOf EloquentModel) ? \$res : ((\$res instanceOf EloquentCollection) ? \$res[0] : null);
+        if (\$test && method_exists(\$test, '___getModel')) {
+            \$cl = true;
+            if (\$res instanceOf EloquentModel) {
+                \$res = [\$res];
+                \$cl = false;
+            }
+            if (\$cl) {
+                \$pcl = new \\Propel\\Runtime\\Collection\\ObjectCollection;
+            }
+            foreach (\$res as \$m) {
+                \$m = \$m->___getModel();
+                if (\$cl) {
+                    \$pcl->append(\$m);
+                } else {
+                    return \$m;
+                }
+            }
+            return \$pcl;
+        } else {
+            return \$res;
         }
     }
 {$methods}}
