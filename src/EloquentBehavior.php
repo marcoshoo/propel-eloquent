@@ -193,6 +193,40 @@ public function __get($key)
 ';
     }
 
+    public function objectCall()
+    {
+
+
+//
+
+//         $matches = null;
+//         $pattern = '/( +)throw new BadMethodCallException\(.*\);( +)?\n?( +)?/';
+//         preg_match($pattern, $script, $matches);
+//         $replacement =
+//         $matches[1] . "\\\$columnName = substr(\\\$name, 3);\n\n" .
+//         $matches[1] . "if (0 === strpos(\\\$name, 'set') && method_exists(\\\$this, 'set' . \\\$columnName)) {\n" .
+//         $matches[1] . "    return call_user_func_array([\\\$this, 'set' . \\\$columnName], \\\$params);\n" .
+//         $matches[1] . "}\n\n" .
+//         $matches[1] . "try{\n" . $matches[1] . "    return call_user_func_array([ \$this, '___callEloquent' ], func_get_args());\n" .
+//         $matches[1] . "} catch(\Exception \$e) {\n    " . $matches[0] . "    }\n". $matches[3];
+
+//         $script = preg_replace($pattern, $replacement, $script);
+
+        return <<<EOD
+    \$columnName = substr(\$name, 3);
+
+    if (0 === strpos(\$name, 'set') && method_exists(\$this, 'set' . \$columnName)) {
+        return call_user_func_array([\$this, 'set' . \$columnName], \$params);
+    }
+
+    try{
+        return call_user_func_array([ \$this, '___callEloquent' ], func_get_args());
+    } catch(\Exception \$e) {}
+
+EOD;
+
+    }
+
     public function objectFilter(&$script)
     {
         foreach ($this->getTable()->getColumns() as $col) {
@@ -289,19 +323,6 @@ EOD;
 
 EOD;
         $replacement = $matches[0] . "\n" . $matches[4] . $forceFill;
-
-        $script = preg_replace($pattern, $replacement, $script);
-
-        $matches = null;
-        $pattern = '/( +)throw new BadMethodCallException\(.*\);( +)?\n?( +)?/';
-        preg_match($pattern, $script, $matches);
-        $replacement =
-            $matches[1] . "\\\$columnName = substr(\\\$name, 3);\n\n" .
-            $matches[1] . "if (0 === strpos(\\\$name, 'set') && method_exists(\\\$this, 'set' . \\\$columnName)) {\n" .
-            $matches[1] . "    return call_user_func_array([\\\$this, 'set' . \\\$columnName], \\\$params);\n" .
-            $matches[1] . "}\n\n" .
-            $matches[1] . "try{\n" . $matches[1] . "    return call_user_func_array([ \$this, '___callEloquent' ], func_get_args());\n" .
-            $matches[1] . "} catch(\Exception \$e) {\n    " . $matches[0] . "    }\n". $matches[3];
 
         $script = preg_replace($pattern, $replacement, $script);
 
