@@ -184,34 +184,66 @@ public function __set($key, $value)
  * Dynamically retrieve attributes on the model.
  *
  * @param  string  $key
+ * @throws BadMethodCallException
+ * @return mixed
+ */
+protected function ___getAttribute($key)
+{
+    $str = new \Illuminate\Support\Str;
+    $rx = new \ReflectionClass($this);
+    $skey = $str->studly($key);
+
+    $property_name = \'coll\' . $skey;
+    $property = $rx->hasProperty($property_name) ? $rx->getProperty($property_name) : null;
+    $method_name = \'get\' . $skey;
+    $method = $rx->hasMethod($method_name) ? $rx->getMethod($method_name) : null;
+    if ($property && $method) {
+        return $method->invoke($this);
+    }
+
+    $property_name = \'a\' . $skey;
+    $property = $rx->hasProperty($property_name) ? $rx->getProperty($property_name) : null;
+    $method_name = \'___getColumn\' . $skey;
+    $method = $rx->hasMethod($method_name) ? $rx->getMethod($method_name) : null;
+    if ($property && $method) {
+        return $method->invoke($this);
+    }
+
+    $info = explode(\'_\', $key);
+    if (count($info) == 2) {
+        $skey = $str->studly($info[1]) . \'RelatedBy\' . $str->studly($info[0]);
+        $property_name2 = \'a\' . $skey;
+        $property_name1 = \'coll\' . $skey;
+        $property = $rx->hasProperty($property_name1) ? $rx->getProperty($property_name1) : ($rx->hasProperty($property_name2) ? $rx->getProperty($property_name2) : null);
+        $method_name = \'get\' . $skey;
+        $method = $rx->hasMethod($method_name) ? $rx->getMethod($method_name) : null;
+        if ($property && $method) {
+            return $method->invoke($this);
+        }
+    }
+
+    throw new BadMethodCallException(\'Invalid attribute.\');
+}
+
+/**
+ * Dynamically retrieve attributes on the model.
+ *
+ * @param  string  $key
  * @return mixed
  */
 public function __get($key)
 {
-    return $this->___model->getAttribute($key);
+    try {
+        return $this->___getAttribute($key);
+    } catch (BadMethodCallException $e) {
+        return $this->___model->getAttribute($key);
+    }
 }
 ';
     }
 
     public function objectCall()
     {
-
-
-//
-
-//         $matches = null;
-//         $pattern = '/( +)throw new BadMethodCallException\(.*\);( +)?\n?( +)?/';
-//         preg_match($pattern, $script, $matches);
-//         $replacement =
-//         $matches[1] . "\\\$columnName = substr(\\\$name, 3);\n\n" .
-//         $matches[1] . "if (0 === strpos(\\\$name, 'set') && method_exists(\\\$this, 'set' . \\\$columnName)) {\n" .
-//         $matches[1] . "    return call_user_func_array([\\\$this, 'set' . \\\$columnName], \\\$params);\n" .
-//         $matches[1] . "}\n\n" .
-//         $matches[1] . "try{\n" . $matches[1] . "    return call_user_func_array([ \$this, '___callEloquent' ], func_get_args());\n" .
-//         $matches[1] . "} catch(\Exception \$e) {\n    " . $matches[0] . "    }\n". $matches[3];
-
-//         $script = preg_replace($pattern, $replacement, $script);
-
         return <<<EOD
     \$columnName = substr(\$name, 3);
 
@@ -221,7 +253,11 @@ public function __get($key)
 
     try{
         return call_user_func_array([ \$this, '___callEloquent' ], func_get_args());
-    } catch(\Exception \$e) {}
+    } catch(\Exception \$e) {
+        try {
+            return \$this->___getAttribute(\$name);
+        } catch (BadMethodCallException \$e) {}
+    }
 
 EOD;
 
