@@ -3,7 +3,6 @@
 namespace MarcosHoo\PropelEloquent\Routing;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Container\Container;
 use Illuminate\Routing\Controller;
 use Illuminate\Routing\Pipeline;

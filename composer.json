@@ -23,7 +23,7 @@
 	},
 	"extra" : {
 		"name" : "eloquent",
-		"class" : "\\MarcosHoo\\PropelEloquent\\Behavior\\EloquentBehavior"
+		"class" : "\\MarcosHoo\\PropelEloquent\\EloquentBehavior"
 	},
 	"require-dev" : {
 		"laravel/framework" : "5.2.*",
