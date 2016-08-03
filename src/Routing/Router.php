@@ -4,14 +4,30 @@ namespace MarcosHoo\PropelEloquent\Routing;
 
 use Illuminate\Database\Eloquent\Model;
 use Propel\Runtime\ActiveRecord\ActiveRecordInterface;
+use \Illuminate\Routing\Router as IlluminateRouter;
 
 /**
  *
  * @author marcos
  *
  */
-class Router extends \Illuminate\Routing\Router
+class Router extends IlluminateRouter
 {
+    /**
+     * Create a new Route object.
+     *
+     * @param  array|string  $methods
+     * @param  string  $uri
+     * @param  mixed  $action
+     * @return \Illuminate\Routing\Route
+     */
+    protected function newRoute($methods, $uri, $action)
+    {
+        return (new Route($methods, $uri, $action))
+            ->setRouter($this)
+            ->setContainer($this->container);
+    }
+
     /**
      * Substitute the implicit Eloquent\Propel model bindings for the route.
      *

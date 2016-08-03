@@ -2,47 +2,96 @@
 namespace MarcosHoo\PropelEloquent;
 
 use Propel\Generator\Model\Behavior;
+use MarcosHoo\PropelEloquent\Builder\EloquentBuilder;
+use MarcosHoo\PropelEloquent\Builder\RequestObjectBuilder;
 
 class EloquentBehavior extends Behavior
 {
-    protected $parameters = [];
+    /**
+     *
+     * @var array
+     */
+    protected $additionalBuilders = [
+        EloquentBuilder::class,
+        RequestObjectBuilder::class,
+    ];
 
+    /**
+     *
+     * @return string
+     */
     public function getTableNameSpace()
     {
         return $this->getTable()->getNamespace();
     }
 
+    /**
+     *
+     * @return string
+     */
     public function getTableClassName()
     {
         return $this->getTable()->getPhpName();
     }
 
+    /**
+     *
+     * @return string
+     */
     public function getTableFullClassName()
     {
         return $this->getTableNameSpace() . '\\' . $this->getTableClassName();
     }
 
+    /**
+     *
+     * @return string
+     */
     public function getEloquentFullClassName()
     {
-        return head(explode('\\',$this->getTableNameSpace())) . '\\' . $this->getTableClassName();
+        return $this->getTableNameSpace() . '\\Eloquent\\' . $this->getTableClassName();
     }
 
+    /**
+     *
+     * @return string
+     */
+    public function objectAttributes()
+    {
+        return '
+/**
+ *
+ * @var \\' . $this->getEloquentFullClassName() . '
+ */
+protected $___model;
+
+/**
+ *
+ * @var boolean
+ */
+public $___alreadyInSet = false;
+';
+    }
+
+    /**
+     *
+     * @return string
+     */
     public function objectMethods()
     {
         return '
 /**
  *
- * @var \Illuminate\Database\Eloquent\Model
+ * @return array
  */
-protected $___model;
-
-/*
- * @var boolean
- */
-public $___alreadyInSet = false;
+public function jsonSerialize()
+{
+    return $this->toArray(TableMap::TYPE_FIELDNAME);
+}
 
 /**
  *
+ * @return \\' . $this->getEloquentFullClassName() . '
  */
 public function getEloquentModel()
 {
@@ -65,7 +114,7 @@ public function ___getEloquentProperty($property)
 /**
  *
  * @throws \Exception
- * @return \Illuminate\Database\Eloquent\Model
+ * @return \\' . $this->getEloquentFullClassName() . '
  */
 protected function ___loadEloquentClass($args = null)
 {
@@ -242,6 +291,10 @@ public function __get($key)
 ';
     }
 
+    /**
+     *
+     * @return string
+     */
     public function objectCall()
     {
         return <<<EOD
@@ -263,8 +316,31 @@ EOD;
 
     }
 
+    /**
+     *
+     * @param string $script
+     */
     public function objectFilter(&$script)
     {
+        $matches = null;
+        $pattern = '/(@package)( )+propel\.generator\.(\.)?(.*)/';
+        preg_match($pattern, $script, $matches);
+
+        $script = preg_replace($pattern, $matches[1] . $matches[2] . $matches[4], $script);
+
+        $matches = null;
+        $pattern = "/(\n\/\*(.*)abstract class " . $this->getTableClassName() .  "( extends \w+)?)( implements (\w|,)+)?((.+)?\n\{)/sm";
+        preg_match($pattern, $script, $matches);
+
+        $replacement =
+            "use \JsonSerializable;\n"
+            . "use MarcosHoo\PropelEloquent\Model\Contracts\HydrateFromContract;\n"
+            . "use MarcosHoo\PropelEloquent\Model\HydrateFromTrait;\n\n"
+            . $matches[1] . $matches[4] . ($matches[4] ? ', ' : ' implements ')
+            . 'HydrateFromContract, JsonSerializable' . $matches[6] . "\n    use HydrateFromTrait;\n";
+
+        $script = preg_replace($pattern, $replacement, $script);
+
         foreach ($this->getTable()->getColumns() as $col) {
 
             $col = $col->getName();
@@ -365,7 +441,7 @@ EOD;
         $constructor = <<<EOD
         \$args = func_get_args();
         if (isset(\$args[0])) {
-            if (\$args[0] instanceof \Illuminate\Database\Eloquent\Model) {
+            if (\$args[0] instanceof \\{$this->getEloquentFullClassName()}) {
                 \$this->___fill(\$args[0]->getAttributes(), true);
                 \$this->___model = \$args[0];
             } elseif (is_array(\$args[0])) {
@@ -389,220 +465,6 @@ EOD;
                 $matches[0] . $matches[1] . "\n" . $constructor;
         }
         $script = preg_replace($pattern, $replacement, $script);
-
-        $namespace = head(explode('\\', $this->getTableNameSpace()));
-        $class = $this->getTableClassName();
-
-        $behaviors = [];
-        foreach ($this->getTable()->getBehaviors() as $behavior) {
-            array_push($behaviors, $behavior->getName());
-        }
-
-        $table = $this->getTable()->getName();
-        $primaryKey = $this->getTable()->getPrimaryKey()[0]->getName();
-        $timestamps = in_array('timestampable', array_keys($behaviors));
-
-        $fmt = function ($s) {
-            return str_replace('{:nlw:}', '\n', str_replace('\n', "\n", str_replace('\\\\n', '{:nlw:}', $s)));
-        };
-
-        $uses =
-            isset($this->parameters['uses'])
-                ? "\nuse " . implode(";\nuse ",explode(',',$this->getParameter('uses'))) . ";\n" : '';
-
-        $interfaces =
-            isset($this->parameters['interfaces'])
-                ? 'implements ' . $fmt($this->getParameter('interfaces'))
-                : '';
-
-        $traits =
-            isset($this->parameters['traits'])
-                ? 'use ' . $fmt($this->getParameter('traits')) . ";\n\n    "
-                : '';
-
-        $properties =
-            isset($this->parameters['properties'])
-                ? ''. $fmt($this->getParameter('properties')) . "\n\n    "
-                : '';
-
-        $methods =
-            isset($this->parameters['methods'])
-                ? "\n    " . $fmt($this->getParameter('methods')) . "\n"
-                : '';
-
-        $script .= "
-namespace {$namespace};
-{$uses}
-
-use Illuminate\\Database\\Eloquent\\Model as EloquentModel;
-use Illuminate\\Database\\Eloquent\\Collection as EloquentCollection;
-
-class {$class} extends EloquentModel {$interfaces}
-{
-    {$traits}{$properties}protected \$___model;
-
-    protected \$table = '{$table}';
-
-    protected \$primaryKey = '{$primaryKey}';
-";
-
-        if (!$timestamps) {
-            $script .= "
-    protected \$timestamps = false;
-
-";
-        }
-
-        $script .= "
-
-    /*
-     * @var boolean
-     */
-    public \$___alreadyInSet = false;
-
-    public function __construct()
-    {
-        \$args = func_get_args();
-        if (isset(\$args[0]) && \$args[0] instanceof \\{$this->getTableFullClassName()}) {
-            \$this->___model = \$args[0];
-            \$args = null;
-        } else {
-            \$this->___model = \$this->___model ?: new \\{$this->getTableFullClassName()}(\$this);
-        }
-        \$this->___init();
-        if (isset(\$args[0])) {
-            parent::__construct(\$args[0]);
-        } else {
-            parent::__construct();
-        }
-    }
-
-    protected function ___init()
-    {
-        \$r1 = new \ReflectionClass(\$this);
-        \$r1 = \$r1->getParentClass();
-        \$r2 = new \ReflectionClass(\$this->___model);
-        foreach (\$r1->getProperties() as \$p) {
-            \$n = \$p->getName();
-            if (\$r2->hasProperty(\$n)) {
-                \$this->\$n = \$this->___model->___getEloquentProperty(\$n);
-            }
-        }
-    }
-
-    public function setRawAttributes(array \$attributes, \$sync = false)
-    {
-        parent::setRawAttributes(\$attributes, \$sync);
-        \$this->___model->___fill(\$attributes, true, true);
-    }
-
-    public function ___getModel()
-    {
-        return \$this->___model;
-    }
-
-    public function ___setModel(\\{$namespace}\\{$class} \$model)
-    {
-        \$this->___model = \$model;
-    }
-
-    public function _set(\$key, \$value)
-    {
-        if (!\$this->___alreadyInSet) {
-            \$this->___alreadyInSet = true;
-            if (!\$this->___model->___alreadyInSet) {
-                \$this->___model->\$key = \$value;
-            } else {
-                parent::setAttribute(\$key, \$value);
-            }
-            \$this->___alreadyInSet = false;
-        } else {
-            parent::setAttribute(\$key, \$value);
-        }
-    }
-
-    public function setAttribute(\$key, \$value)
-    {
-        if (!\$this->___alreadyInSet) {
-            \$this->___alreadyInSet = true;
-            parent::setAttribute(\$key, \$value);
-            \$this->___model->\$key = \$value;
-            \$this->___alreadyInSet = false;
-        }
-        return \$this;
-    }
-
-    public function save(array \$options = [])
-    {
-        \$saved = parent::save(\$options);
-        if (\$saved && \$this->___model) {
-            \$pk = \$this->primaryKey;
-            \$this->___alreadyInSet = true;
-            \$this->___model->\$pk = \$this->\$pk;
-            \$this->___alreadyInSet = false;
-            \$this->___model->setNew(false);
-            \$this->___model->resetModified();
-            \$args = func_get_args();
-            \$this->___model->reload('false', isset(\$args[1]) ? \$args[1] : null);
-        }
-    }
-
-    public function delete()
-    {
-        if (\$this->___model) {
-            \$args = func_get_args();
-            \$this->___model->delete(isset(\$args[1]) ? \$args[1] : null);
-        }
-        \$this->exists = false;
-    }
-
-    public function  __call(\$name, \$params)
-    {
-        if (\$this->___model && method_exists(\$this->___model, \$name)) {
-            return call_user_func_array([ \$this->___model, \$name ], \$params);
-        } else {
-            return parent::__call(\$name, \$params);
-        }
-    }
-
-    public static function all(\$columns = ['*']) {
-        return self::___static(parent::all(\$columns));
-    }
-
-    public static function __callStatic(\$method, \$parameters)
-    {
-        \$instance = new static;
-
-        return static::___static(call_user_func_array([\$instance, \$method], \$parameters));
-    }
-
-    protected static function ___static(\$res)
-    {
-        \$test = (\$res instanceOf EloquentModel) ? \$res : ((\$res instanceOf EloquentCollection) ? \$res[0] : null);
-        if (\$test && method_exists(\$test, '___getModel')) {
-            \$cl = true;
-            if (\$res instanceOf EloquentModel) {
-                \$res = [\$res];
-                \$cl = false;
-            }
-            if (\$cl) {
-                \$pcl = new \\Propel\\Runtime\\Collection\\ObjectCollection;
-            }
-            foreach (\$res as \$m) {
-                \$m = \$m->___getModel();
-                if (\$cl) {
-                    \$pcl->append(\$m);
-                } else {
-                    return \$m;
-                }
-            }
-            return \$pcl;
-        } else {
-            return \$res;
-        }
-    }
-{$methods}}
-";
 
     }
 }

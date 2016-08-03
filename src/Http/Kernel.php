@@ -4,7 +4,6 @@ namespace MarcosHoo\PropelEloquent\Http;
 
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Contracts\Foundation\Application;
-use MarcosHoo\PropelEloquent\RouterClassNotFoundException;
 use MarcosHoo\PropelEloquent\Routing\Router as Router;
 use Illuminate\Routing\Router as DefaultRouter;
 
