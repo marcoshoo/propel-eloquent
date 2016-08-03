@@ -1,8 +1,8 @@
 # Propel Eloquent #
 
-`Propel Eloquent` é um `behavior` para [Propel2](http://propelorm.org) que faz as classes de modelo extenderem virtualmente uma classe de modelo [Eloquent](http://laravel.com/docs/5.1/eloquent). Ao executar a construção do modelo, diversos métodos e atributos são criados na classe `Base` do modelo e também é gerada uma nova classe heradada de `Illuminate\Database\Eloquent\Model` no namespace `Eloquent` que é utilizada pela classe `Base` para simular um objeto `Eloquent`.
+Propel Eloquent é um `behavior` para [Propel2](http://propelorm.org) que faz as classes de modelo extenderem virtualmente uma classe de modelo [Eloquent](http://laravel.com/docs/5.1/eloquent). Ao executar a construção do modelo, diversos métodos e atributos são criados na classe `Base` do modelo e também é gerada uma nova classe heradada de `Illuminate\Database\Eloquent\Model` no namespace `Eloquent` que é utilizada pela classe `Base` para simular um objeto `Eloquent`.
 
- O pacote também traz implementações para a injeção de dependência "hidratada" nos controladores tanto para objetos existentes(1) quanto vindos pelo request(2). Para que esses recursos funcionem é necessário o `kernel` da aplicação extenda de `MarcosHoo\PropelEloquent\Http\Kernel`): 
+ O pacote também traz implementações para a injeção de dependência "hidratada" nos controladores tanto para objetos existentes(1) quanto vindos pelo request(2). Para que esses recursos funcionem é necessário que o `kernel` da aplicação extenda de `MarcosHoo\PropelEloquent\Http\Kernel`): 
  
 ```PHP
 <?php
@@ -44,12 +44,13 @@ class EntityController extends Controller
 
 # Instalação #
 
-Adicione o pacote `MarcosHoo\PropelEloquent` como dependência ao composer.json:
+Adicione os pacotes como dependência ao composer.json:
 
 ```javascript
 {
     "require": {
-        "marcoshoo/propel-eloquent": "dev-master"
+    	"propel/propel-laravel" : "dev-develop",
+        "marcoshoo/propel-eloquent": "dev-develop"
     }
 }
 ```
