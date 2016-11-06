@@ -5,7 +5,250 @@ use Propel\Generator\Model\Behavior;
 
 class EloquentBehavior extends Behavior
 {
-    protected $parameters = [];
+    public function objectMethods()
+    {
+        $mutators = "\n";
+
+        foreach ($this->getTable()->getColumns() as $col) {
+            $class = $this->getTableFullClassName();
+            $name = $col->getName();
+            $phpname = $col->getPhpName();
+            $mutators .= "/**
+ * Set the value of [{$name}] column.
+ *
+ * @param string \$v new value
+ * @return \$this|\{$class} The current object (for fluent API support)
+ */
+public function set{$phpname}Temp(\$value)
+{
+    \$result = \$this->set{$phpname}Attribute(\$value);    
+    \$this->attributes['{$name}'] = \$this->{$name};
+
+    return \$result;
+}
+
+/**
+ * Attribute {$name} accessor.
+ *
+ * @param mixed \$value
+ * @return mixed
+ */
+public function get{$phpname}Attribute(\$value)
+{
+    return get{$phpname}();
+}
+
+";
+        }
+
+        return $mutators .
+        '/**
+ * Get an attribute from the model.
+ *
+ * @param  string  $key
+ * @return mixed
+ */
+public function getAttribute($key)
+{
+    $method = \'get\' . str_replace(\' \', \'\', ucwords(str_replace(\'_\', \' \', $key)));
+    return method_exists($this, $method) ? call_user_func([$this, $method]) : null;
+}
+
+/**
+ * Set a given attribute on the model.
+ *
+ * @param  string  $key
+ * @param  mixed  $value
+ * @return $this
+ */
+public function setAttribute($key, $value)
+{
+    $method = \'set\' . str_replace(\' \', \'\', ucwords(str_replace(\'_\', \' \', $key)));
+    return method_exists($this, $method) ? call_user_func([$this, $method], $value) : null;
+}
+
+/**
+ * Dynamically retrieve attributes on the model.
+ *
+ * @param  string  $key
+ * @return mixed
+ */
+public function __get($key)
+{
+    return $this->getAttribute($key);
+}
+
+/**
+ * Dynamically set attributes on the model.
+ *
+ * @param  string  $key
+ * @param  mixed  $value
+ * @return void
+ */
+public function __set($key, $value)
+{
+    return $this->setAttribute($key, $value);
+}
+
+/**
+ * Sync propel and eloquent attributes.
+ */
+protected function syncAttributes()
+{
+' . implode("\n", array_map(function ($col) {
+            return "    \$this->attributes['{$col->getName()}'] = \$this->{$col->getName()};";
+        }, $this->getTable()->getColumns())) . '
+}
+
+/**
+ * Set the array of model attributes. No checking is done.
+ *
+ * @param  array  $attributes
+ * @param  bool  $sync
+ * @return $this
+ */
+public function setRawAttributes(array $attributes, $sync = false)
+{
+    $this->hydrateThis($attributes, 0, false, TableMap::TYPE_FIELDNAME);
+
+    if ($sync) {
+        $this->syncOriginal();
+    }
+
+    return $this;
+}
+
+/**
+ * Hydrates (populates) the object variables with values from the database resultset.
+ *
+ * @see hydrateThis()
+ */
+public function hydrateThis($row, $startcol = 0, $rehydrate = false, $indexType = TableMap::TYPE_NUM)
+{
+    $result = $this->propelHydrate($row, $startcol, $rehydrate, $indexType);
+    
+    $this->syncAttributes();
+    
+    return $result;
+}
+
+/**
+ * Create a collection of models from plain arrays.
+ *
+ * @param  array  $items
+ * @param  string|null  $connection
+ * @return \Illuminate\Database\Eloquent\Collection
+ */
+public static function hydrateTemp(array $items, $connection = null)
+{
+    $stdToArray = function ($obj) use (&$stdToArray) {
+        $reaged = (array)$obj;
+        foreach ($reaged as $key => &$field) {
+            if (is_object($field)) {
+                $field = $stdToArray($field);
+            }
+        }
+        return $reaged;
+    };
+
+    $map = self::TABLE_MAP;
+    $class = (new $map)->getOMClass(false);
+    $model = new $class;
+
+    foreach ($items as &$item) {
+        $attributes = $stdToArray($item);
+        $item = clone $model;
+        $item->setRawAttributes($attributes, true);
+    }
+
+    return $model->newCollection($items);
+}
+
+/**
+ * Save the model to the database.
+ *
+ * @param  array  $options
+ * @return bool
+ */
+public function saveTemp(array $options = [])
+{
+    if ($this->fireModelEvent(\'saving\') === false) {
+        return false;
+    }
+
+    $con = null; 
+
+    if (is_array($options) && count($options)) {
+        if ($options[0] instanceOf ConnectionInterface) {
+            $con = $options[0];
+            unset($options[0]);
+        } 
+    } elseif (isset($options[0]) &&  $options[0] instanceOf ConnectionInterface) {
+        $con = $options;
+    }
+
+    if ($con === null) {
+        $con = Propel::getServiceContainer()->getWriteConnection(' . $this->getTableClassName() . 'TableMap::DATABASE_NAME);
+    }
+
+    $affectedRows = $this->saveThis($con);
+
+    $this->finishSave($options);
+
+    return $affectedRows;
+}
+
+/**
+ * Delete the model from the database.
+ *
+ * @return bool|null
+ * @throws \Exception
+ */
+public function deleteTemp()
+{
+    $options = func_get_args();
+
+    $con = null; 
+
+    if (is_array($options) && count($options)) {
+        if ($options[0] instanceOf ConnectionInterface) {
+            $con = $options[0];
+            unset($options[0]);
+        } 
+    } elseif (isset($options[0]) &&  $options[0] instanceOf ConnectionInterface) {
+        $con = $options;
+    }
+
+    if ($con === null) {
+        $con = Propel::getServiceContainer()->getWriteConnection(' . $this->getTableClassName() . '::DATABASE_NAME);
+    }
+
+    if (!$this->isNew) {
+        if ($this->fireModelEvent(\'deleting\') === false) {
+            return false;
+        }
+
+        // Here, we\'ll touch the owning models, verifying these timestamps get updated
+        // for the models. This will allow any caching to get broken on the parents
+        // by the timestamp. Then we will go ahead and delete the model instance.
+        $this->touchOwners();
+
+        $this->deleteThis($con);
+
+        $this->exists = false;
+
+        // Once the model has been deleted, we will fire off the deleted event so that
+        // the developers may hook into post-delete operations. We will then return
+        // a boolean true as the delete is presumably successful on the database.
+        $this->fireModelEvent(\'deleted\', false);
+
+        return true;
+    } else {
+       return false;
+    }       
+}
+';
+    }
 
     public function getTableNameSpace()
     {
@@ -22,587 +265,206 @@ class EloquentBehavior extends Behavior
         return $this->getTableNameSpace() . '\\' . $this->getTableClassName();
     }
 
-    public function getEloquentFullClassName()
+    protected function fixPackageName(&$script)
     {
-        return head(explode('\\',$this->getTableNameSpace())) . '\\' . $this->getTableClassName();
-    }
-
-    public function objectMethods()
-    {
-        return '
-/**
- *
- * @var \Illuminate\Database\Eloquent\Model
- */
-protected $___model;
-
-/*
- * @var boolean
- */
-public $___alreadyInSet = false;
-
-/**
- *
- */
-public function getEloquentModel()
-{
-    return $this->___model;
-}
-
-/**
- *
- */
-public function ___getEloquentProperty($property)
-{
-    $r1 = new \ReflectionClass(\'\\' . $this->getEloquentFullClassName() . '\');
-    $r1 = $r1->getParentClass();
-    $r2 = new \ReflectionClass($this);
-    if ($r1->hasProperty($property) && $r2->hasProperty($property)) {
-        return $this->$property;
-    }
-}
-
-/**
- *
- * @throws \Exception
- * @return \Illuminate\Database\Eloquent\Model
- */
-protected function ___loadEloquentClass($args = null)
-{
-    if (!$this->___model) {
-        $this->___model = new \\' . $this->getEloquentFullClassName() . '($this);
-        if (is_array($args)) {
-            $this->___model->fill($args);
+        $matches = null;
+        $pattern = "/@package +propel.*(\.[A-Za-z_0-9]+)( +)?/";
+        $package = str_replace('\\', '.', $this->getTableNameSpace());
+        preg_match($pattern, $script, $matches);
+        if (isset($matches[1])) {
+            $replacement = "@package {$package}{$matches[1]}";
+            $script = preg_replace($pattern, $replacement, $script);
         }
     }
-    return $this->___model;
-}
 
-/**
- *
- * @param string \$name
- * @param array \$params
- * @throws \Exception
- * @return \Illuminate\Database\Eloquent\Collection|boolean
- */
-public function ___callEloquent($name, $params)
-{
-    switch ($name) {
-        case \'hydrate\':
-            if (isset($params[1]) && $params[1] instanceof EloquentCollection) {
-                return $this->___loadEloquentClass()->hydrate($params[0], $params[1]);
-            }
-            break;
-        case \'save\':
-            if (isset($params[0]) && is_array($params[0])) {
-                return $this->___model->save($params[0]);
-            }
-            break;
-        default:
-            $eloquent = $this->___loadEloquentClass();
-            if ($eloquent) {
-                return call_user_func_array([ $eloquent, $name ], $params);
-            }
-    }
-    throw new \Exception(\'Invalid method\');
-}
-
-/**
- *
- * @param string $name
- * @param array $params
- */
-public static function __callstatic($name, $params)
-{
-    return call_user_func_array("' . $this->getEloquentFullClassName() . '::$name" , $params);
-}
-
-/**
- *
- * @param array $attributtes
- * @param boolean $resetModified
- * @param boolean $force
-*/
-public function ___fill(array $attributes = [], $resetModified = false, $force = false)
-{
-    $totallyGuarded = !$force && $this->___model && $this->___model->totallyGuarded();
-    foreach ($attributes as $key => $value) {
-        if ($totallyGuarded) {
-            throw new \Illuminate\Database\Eloquent\MassAssignmentException($key);
-        }
-        $method = \'set\' . $key;
-        if (method_exists($this, $method)) {
-            $this->$method($value);
+    protected function changeClassDeclaration(&$script)
+    {
+        $matches = null;
+        $pattern = '/(\n+\/\*\*.*abstract +class +[A-Za-z_0-9]+ +)(extends +([A-Za-z_0-9]+) +)?(implements +[A-Za-z_0-9]+)(( |\n)+)?{/sm';
+        preg_match($pattern, $script, $matches);
+        if ($matches[2] == '') {
+            $replacement = "use \Illuminate\Database\Eloquent\Model as EloquentModel;\n{$matches[1]}extends EloquentModel {$matches[4]}{$matches[5]}{";
+            $script = preg_replace($pattern, $replacement, $script);
         } else {
-            $this->$key = $value;
-        }
-    }
-    if ($resetModified) {
-        $this->resetModified();
-        $this->setDeleted(false);
-    }
-}
-
-/**
- * Fill the model with an array of attributes. Force mass assignment.
- *
- * @param  array  $attributes
- * @param boolean $resetModified
- * @return $this
- */
-public function ___forceFill(array $attributes, $resetModified = false)
-{
-    $this->___fill($attributes, $resetModified, true);
-}
-
-/**
- * Dynamically set attributes on the model.
- *
- * @param  string  $key
- * @param  mixed   $value
- * @return void
- */
-public function __set($key, $value)
-{
-    if (!$this->___alreadyInSet) {
-        $this->___alreadyInSet = true;
-        $name = ' . $this->getTable()->getPhpName() . 'TableMap::getTableMap()->getColumn($key)->getPhpName();
-        $method = \'set\' . $name;
-        $eloquent = $this->___model;
-        if (method_exists($this, $method)) {
-            $r = new \ReflectionMethod($this, $method);
-            if ($r->isPublic()) {
-                $r->invoke($this, $value);
-            }
-        }
-        $eloquent->setAttribute($key, $value);
-        $this->___alreadyInSet = false;
-    }
-}
-
-/**
- * Dynamically retrieve attributes on the model.
- *
- * @param  string  $key
- * @throws BadMethodCallException
- * @return mixed
- */
-protected function ___getAttribute($key)
-{
-    $str = new \Illuminate\Support\Str;
-    $rx = new \ReflectionClass($this);
-    $skey = $str->studly($key);
-
-    $property_name = \'coll\' . $skey;
-    $property = $rx->hasProperty($property_name) ? $rx->getProperty($property_name) : null;
-    $method_name = \'get\' . $skey;
-    $method = $rx->hasMethod($method_name) ? $rx->getMethod($method_name) : null;
-    if ($property && $method) {
-        return $method->invoke($this);
-    }
-
-    $property_name = \'a\' . $skey;
-    $property = $rx->hasProperty($property_name) ? $rx->getProperty($property_name) : null;
-    $method_name = \'___getColumn\' . $skey;
-    $method = $rx->hasMethod($method_name) ? $rx->getMethod($method_name) : null;
-    if ($property && $method) {
-        return $method->invoke($this);
-    }
-
-    $info = explode(\'_\', $key);
-    if (count($info) == 2) {
-        $skey = $str->studly($info[1]) . \'RelatedBy\' . $str->studly($info[0]);
-        $property_name2 = \'a\' . $skey;
-        $property_name1 = \'coll\' . $skey;
-        $property = $rx->hasProperty($property_name1) ? $rx->getProperty($property_name1) : ($rx->hasProperty($property_name2) ? $rx->getProperty($property_name2) : null);
-        $method_name = \'get\' . $skey;
-        $method = $rx->hasMethod($method_name) ? $rx->getMethod($method_name) : null;
-        if ($property && $method) {
-            return $method->invoke($this);
+            $replacement = "use \Illuminate\Database\Eloquent\Model as EloquentModel;\n{$matches[1]}extends EloquentModel {$matches[4]}{$matches[5]}{\n    use {$matches[3]};\n";
+            $script = preg_replace($pattern, $replacement, $script);
         }
     }
 
-    throw new BadMethodCallException(\'Invalid attribute.\');
-}
-
-/**
- * Dynamically retrieve attributes on the model.
- *
- * @param  string  $key
- * @return mixed
- */
-public function __get($key)
-{
-    try {
-        return $this->___getAttribute($key);
-    } catch (BadMethodCallException $e) {
-        return $this->___model->getAttribute($key);
-    }
-}
-';
-    }
-
-    public function objectCall()
+    protected function changeConstructor(&$script)
     {
-        return <<<EOD
-    \$columnName = substr(\$name, 3);
-
-    if (0 === strpos(\$name, 'set') && method_exists(\$this, 'set' . \$columnName)) {
-        return call_user_func_array([\$this, 'set' . \$columnName], \$params);
+        $matches = null;
+        $pattern = '/( +\/\*\*\n +\* Initializes.*public +function +__construct\()(\)( +)?(\n+)?( +)?{( +)?(\n+)?)( +)?(\$this->applyDefaultValues\(\);( +)?(\n+))(( +)})/sm';
+        preg_match($pattern, $script, $matches);
+        if (count($matches)) {
+            $replacement = "{$matches[1]}array \$attributes = []{$matches[2]}{$matches[8]}parent::__construct(\$attributes);\n{$matches[8]}{$matches[9]}{$matches[12]}";
+            $script = preg_replace($pattern, $replacement, $script);
+        } else {
+            $pattern = '/( +\/\*\*\n +\* Initializes.*public +function +__construct\()(\)( +)?(\n+)?( +)?{)([ \n]+)?(\n( +)})/sm';
+            preg_match($pattern, $script, $matches);
+            $replacement = "{$matches[1]}array \$attributes = []{$matches[2]}\n{$matches[8]}    parent::__construct(\$attributes);{$matches[7]}";
+            $script = preg_replace($pattern, $replacement, $script);
+        }
     }
 
-    try{
-        return call_user_func_array([ \$this, '___callEloquent' ], func_get_args());
-    } catch(\Exception \$e) {
-        try {
-            return \$this->___getAttribute(\$name);
-        } catch (BadMethodCallException \$e) {}
+    protected function renameSetMethods(&$script)
+    {
+        $matches = null;
+
+        foreach ($this->getTable()->getColumns() as $col) {
+            $phpname = $col->getPhpName();
+            $pattern = "/function set{$phpname}\(/";
+            $replacement = "function set{$phpname}Attribute(";
+            $script = preg_replace($pattern, $replacement, $script);
+        }
+
+        $pattern = "/function +(set[a-zA-Z0-9_]+)Temp\(/";
+        preg_match($pattern, $script, $matches);
+        if (isset($matches[1])) {
+            $replacement = 'function ${1}(';
+            $script = preg_replace($pattern, $replacement, $script);
+        }
     }
 
-EOD;
+    protected function renameHydrateMethod(&$script)
+    {
+        $pattern = "/public +function +hydrate\(/";
+        $replacement = "protected function propelHydrate(";
+        $script = preg_replace($pattern, $replacement, $script);
 
+        $pattern = '/\$this->hydrate\(/';
+        $replacement = '$this->hydrateThis(';
+        $script = preg_replace($pattern, $replacement, $script);
+
+        $pattern = '/\$obj->hydrate\(/';
+        $replacement = '$obj->hydrateThis(';
+        $script = preg_replace($pattern, $replacement, $script);
+
+        $pattern = "/ hydrateTemp\(/";
+        $replacement = " hydrate(";
+        $script = preg_replace($pattern, $replacement, $script);
+    }
+
+    public function renameSaveMethods(&$script)
+    {
+        $pattern = '/function +save\(/';
+        $replacement = 'function saveThis(';
+        $script = preg_replace($pattern, $replacement, $script);
+
+        $pattern = '/(\$[A-Za-z_0-9]+)->save\(\$con\)/';
+        preg_match($pattern, $script, $matches);
+        if (isset($matches[1]) && $matches[1] !== '$this') {
+            $replacement = '${1}->save(${1} instanceof EloquentModel ? [$con] : $con)';
+            $script = preg_replace($pattern, $replacement, $script);
+        }
+
+        $pattern = '/(\$this->([A-Za-z_0-9]+))->save\(\$con\)/';
+        preg_match($pattern, $script, $matches);
+        if (isset($matches[1])) {
+            $replacement = '$this->${1}->save($this->${1} instanceof EloquentModel ? [$con] : $con)';
+            $script = preg_replace($pattern, $replacement, $script);
+        }
+
+        $pattern = '/\$this->save\((.*)\)/';
+        preg_match($pattern, $script, $matches);
+        $con = isset($matches[1]) ? $matches[1] : '';
+        $replacement = "\$this->save([{$con}])";
+        $script = preg_replace($pattern, $replacement, $script);
+
+        $pattern = '/ saveTemp\(/';
+        $replacement = ' save(';
+        $script = preg_replace($pattern, $replacement, $script);
+
+        $pattern = '/\$this->saveTemp\(/';
+        $replacement = '$this->save(';
+        $script = preg_replace($pattern, $replacement, $script);
+    }
+
+    public function renameDeleteMethods(&$script)
+    {
+        $pattern = '/public +function +delete\(/';
+        $replacement = 'protected function deleteThis(';
+        $script = preg_replace($pattern, $replacement, $script);
+
+        $pattern = '/(\$[A-Za-z_0-9]+)->delete\(\$con\)/';
+        preg_match($pattern, $script, $matches);
+        if (isset($matches[1]) && $matches[1] !== '$this') {
+            $replacement = '${1}->delete(${1} instanceof EloquentModel ? [$con] : $con)';
+            $script = preg_replace($pattern, $replacement, $script);
+        }
+
+        $pattern = '/(\$this->([A-Za-z_0-9]+))->delete\(\$con\)/';
+        preg_match($pattern, $script, $matches);
+        if (isset($matches[1])) {
+            $replacement = '$this->${1}->delete($this->${1} instanceof EloquentModel ? [$con] : $con)';
+            $script = preg_replace($pattern, $replacement, $script);
+        }
+
+        $pattern = '/\$this->delete\((.*)\)/';
+        preg_match($pattern, $script, $matches);
+        $con = isset($matches[1]) ? $matches[1] : '';
+        $replacement = "\$this->delete([{$con}])";
+        $script = preg_replace($pattern, $replacement, $script);
+
+        $pattern = '/ deleteTemp\(/';
+        $replacement = ' delete(';
+        $script = preg_replace($pattern, $replacement, $script);
+
+        $pattern = '/\$this->deleteTemp\(/';
+        $replacement = '$this->delete(';
+        $script = preg_replace($pattern, $replacement, $script);
+    }
+
+    protected function changePrePostMethods(&$script)
+    {
+        $pattern = "/if +\(is_callable\('parent::(pre|post)[a-zA-Z0-9_]+'\)\) +{/";
+        $replacement = 'if (($p = get_parent_class(self::class)) && (new \ReflectionClass($p))->hasMethod(__FUNCTION__)) {';
+        $script = preg_replace($pattern, $replacement, $script);
+    }
+
+    protected function changeMagicCallMethod(&$script)
+    {
+        $pattern = '/throw new BadMethodCallException\(sprintf\(\'Call to undefined method: %s.\', \$name\)\);/';
+        $replacement = 'return parent::__call($name, $params);';
+        $script = preg_replace($pattern, $replacement, $script);
+    }
+
+    public function setTableMapTypeFieldNameAsDefault(&$script)
+    {
+        $pattern = '/toArray\(TableMap::TYPE_PHPNAME/';
+        $replacement = 'toArray(TableMap::TYPE_FIELDNAME';
+        $script = preg_replace($pattern, $replacement, $script);
+
+        $pattern = '/\ype += +TableMap::TYPE_PHPNAME/';
+        $replacement = 'ype = TableMap::TYPE_FIELDNAME';
+        $script = preg_replace($pattern, $replacement, $script);
+    }
+
+    public function tableMapFilter(&$script)
+    {
+        $this->fixPackageName($script);
+        $this->renameSaveMethods($script);
+        $this->renameHydrateMethod($script);
+    }
+
+    public function queryFilter(&$script)
+    {
+        $this->fixPackageName($script);
+        $this->renameSaveMethods($script);
+        $this->renameHydrateMethod($script);
     }
 
     public function objectFilter(&$script)
     {
-        foreach ($this->getTable()->getColumns() as $col) {
-
-            $col = $col->getName();
-
-            $script = preg_replace("/protected( +)\\\${$col};/", "protected \$column_{$col};", $script);
-
-            $name = $this->getTable()->getColumn($col)->getPhpName();
-
-            foreach ([' ', '( +)?\)', '( +)?=', '( +)?;', '( +)?,', '->'] as $search) {
-
-                $matches = null;
-                $pattern = "/\\\$this->({$col})(${search})/";
-                preg_match($pattern, $script, $matches);
-
-                if (count($matches) > 2) {
-                    $replacement = '$this->column_' . $matches[1] . $matches [2];
-                    $script = preg_replace($pattern, $replacement, $script);
-                }
-
-            }
-
-            $matches = null; //{$name}
-            $pattern = "/(public function( +)?get{$name}\(((\\$\w+) = (.*))?\))/";
-            preg_match($pattern, $script, $matches);
-
-            $params = isset($matches[3]) ? $matches[3] : '';
-            $var = isset($matches[4]) ? $matches[4] : '';
-
-            $replacement = <<<EOD
-public function get{$name}({$params})
-    {
-        return \$this->___getColumn{$name}({$var});
-    }
-
-    /**
-     * Get the [{$col}] column value.
-     *
-     * @return boolean
-     */
-    protected function ___getColumn{$name}({$params})
-EOD;
-
-            $script = preg_replace($pattern,$replacement, $script);
-
-            $matches = null;
-            $pattern = "/(public function( +)?set{$name}\(\\\$v\)( +)?\n?( +)?{)(( +)?(.*)\/\/( +)set{$name})/sm";
-            preg_match($pattern, $script, $matches);
-
-            if (count($matches) > 8) {
-
-                $replacement = <<<EOD
-public function set{$name}(\$v)
-    {
-        return \$this->___setColumn{$name}(\$v);
-    }
-
-    /**
-     * Set the value of [{$col}] column.
-     *
-     * @param string \$v new value
-     * @return \$this|{$this->getTableFullClassName()} The current object (for fluent API support)
-     */
-    protected function ___setColumn{$name}(\$v)
-    {
-        \$this->___alreadyInSet = true;
-        \$this->___model->{$col} = \$v;
-        \$this->___alreadyInSet = false;
-{$matches[5]}
-EOD;
-
-                $script = preg_replace($pattern, $replacement, $script);
-            }
-
-        }
-
-        $matches = null;
-        $pattern = '/(( +)?(\$this->ensureConsistency\(\);)\n?( +)?}( +)?\n)/';
-        preg_match($pattern, $script, $matches);
-
-        $forceFill = <<<EOD
-\$values = \$this->toArray(TableMap::TYPE_FIELDNAME);
-            \$columns = [];
-            \$r = new \ReflectionClass(self::class);
-
-            foreach (\$values as \$name => \$value) {
-                if (\$r->hasProperty('column_' . \$name)) {
-                    \$columns[\$name] = \$value;
-                }
-            }
-
-            \$this->___model->forceFill(\$columns);
-
-EOD;
-        $replacement = $matches[0] . "\n" . $matches[4] . $forceFill;
-
-        $script = preg_replace($pattern, $replacement, $script);
-
-        $constructor = <<<EOD
-        \$args = func_get_args();
-        if (isset(\$args[0])) {
-            if (\$args[0] instanceof \Illuminate\Database\Eloquent\Model) {
-                \$this->___fill(\$args[0]->getAttributes(), true);
-                \$this->___model = \$args[0];
-            } elseif (is_array(\$args[0])) {
-                \$this->___loadEloquentClass(\$args[0]);
-            }
-        } else {
-           \$this->___loadEloquentClass();
-        }
-EOD;
-
-        $matches = null;
-        $pattern = '/( +)(public function __construct\(.*\)(( +)?\n?( +?){))/';
-        preg_match($pattern, $script, $matches);
-
-        if (!isset($matches[0])) {
-            $pattern = '/\n\}\n\z/';
-            preg_match($pattern, $script, $matches);
-            $replacement = "\n    public function __construct()\n    {\n" . $constructor . "\n    }" . $matches[0];
-        } else {
-            $replacement =
-                $matches[0] . $matches[1] . "\n" . $constructor;
-        }
-        $script = preg_replace($pattern, $replacement, $script);
-
-        $namespace = head(explode('\\', $this->getTableNameSpace()));
-        $class = $this->getTableClassName();
-
-        $behaviors = [];
-        foreach ($this->getTable()->getBehaviors() as $behavior) {
-            array_push($behaviors, $behavior->getName());
-        }
-
-        $table = $this->getTable()->getName();
-        $primaryKey = $this->getTable()->getPrimaryKey()[0]->getName();
-        $timestamps = in_array('timestampable', array_keys($behaviors));
-
-        $fmt = function ($s) {
-            return str_replace('{:nlw:}', '\n', str_replace('\n', "\n", str_replace('\\\\n', '{:nlw:}', $s)));
-        };
-
-        $uses =
-            isset($this->parameters['uses'])
-                ? "\nuse " . implode(";\nuse ",explode(',',$this->getParameter('uses'))) . ";\n" : '';
-
-        $interfaces =
-            isset($this->parameters['interfaces'])
-                ? 'implements ' . $fmt($this->getParameter('interfaces'))
-                : '';
-
-        $traits =
-            isset($this->parameters['traits'])
-                ? 'use ' . $fmt($this->getParameter('traits')) . ";\n\n    "
-                : '';
-
-        $properties =
-            isset($this->parameters['properties'])
-                ? ''. $fmt($this->getParameter('properties')) . "\n\n    "
-                : '';
-
-        $methods =
-            isset($this->parameters['methods'])
-                ? "\n    " . $fmt($this->getParameter('methods')) . "\n"
-                : '';
-
-        $script .= "
-namespace {$namespace};
-{$uses}
-
-use Illuminate\\Database\\Eloquent\\Model as EloquentModel;
-use Illuminate\\Database\\Eloquent\\Collection as EloquentCollection;
-
-class {$class} extends EloquentModel {$interfaces}
-{
-    {$traits}{$properties}protected \$___model;
-
-    protected \$table = '{$table}';
-
-    protected \$primaryKey = '{$primaryKey}';
-";
-
-        if (!$timestamps) {
-            $script .= "
-    protected \$timestamps = false;
-
-";
-        }
-
-        $script .= "
-
-    /*
-     * @var boolean
-     */
-    public \$___alreadyInSet = false;
-
-    public function __construct()
-    {
-        \$args = func_get_args();
-        if (isset(\$args[0]) && \$args[0] instanceof \\{$this->getTableFullClassName()}) {
-            \$this->___model = \$args[0];
-            \$args = null;
-        } else {
-            \$this->___model = \$this->___model ?: new \\{$this->getTableFullClassName()}(\$this);
-        }
-        \$this->___init();
-        if (isset(\$args[0])) {
-            parent::__construct(\$args[0]);
-        } else {
-            parent::__construct();
-        }
-    }
-
-    protected function ___init()
-    {
-        \$r1 = new \ReflectionClass(\$this);
-        \$r1 = \$r1->getParentClass();
-        \$r2 = new \ReflectionClass(\$this->___model);
-        foreach (\$r1->getProperties() as \$p) {
-            \$n = \$p->getName();
-            if (\$r2->hasProperty(\$n)) {
-                \$this->\$n = \$this->___model->___getEloquentProperty(\$n);
-            }
-        }
-    }
-
-    public function setRawAttributes(array \$attributes, \$sync = false)
-    {
-        parent::setRawAttributes(\$attributes, \$sync);
-        \$this->___model->___fill(\$attributes, true, true);
-    }
-
-    public function ___getModel()
-    {
-        return \$this->___model;
-    }
-
-    public function ___setModel(\\{$namespace}\\{$class} \$model)
-    {
-        \$this->___model = \$model;
-    }
-
-    public function _set(\$key, \$value)
-    {
-        if (!\$this->___alreadyInSet) {
-            \$this->___alreadyInSet = true;
-            if (!\$this->___model->___alreadyInSet) {
-                \$this->___model->\$key = \$value;
-            } else {
-                parent::setAttribute(\$key, \$value);
-            }
-            \$this->___alreadyInSet = false;
-        } else {
-            parent::setAttribute(\$key, \$value);
-        }
-    }
-
-    public function setAttribute(\$key, \$value)
-    {
-        if (!\$this->___alreadyInSet) {
-            \$this->___alreadyInSet = true;
-            parent::setAttribute(\$key, \$value);
-            \$this->___model->\$key = \$value;
-            \$this->___alreadyInSet = false;
-        }
-        return \$this;
-    }
-
-    public function save(array \$options = [])
-    {
-        \$saved = parent::save(\$options);
-        if (\$saved && \$this->___model) {
-            \$pk = \$this->primaryKey;
-            \$this->___alreadyInSet = true;
-            \$this->___model->\$pk = \$this->\$pk;
-            \$this->___alreadyInSet = false;
-            \$this->___model->setNew(false);
-            \$this->___model->resetModified();
-            \$args = func_get_args();
-            \$this->___model->reload('false', isset(\$args[1]) ? \$args[1] : null);
-        }
-    }
-
-    public function delete()
-    {
-        if (\$this->___model) {
-            \$args = func_get_args();
-            \$this->___model->delete(isset(\$args[1]) ? \$args[1] : null);
-        }
-        \$this->exists = false;
-    }
-
-    public function  __call(\$name, \$params)
-    {
-        if (\$this->___model && method_exists(\$this->___model, \$name)) {
-            return call_user_func_array([ \$this->___model, \$name ], \$params);
-        } else {
-            return parent::__call(\$name, \$params);
-        }
-    }
-
-    public static function all(\$columns = ['*']) {
-        return self::___static(parent::all(\$columns));
-    }
-
-    public static function __callStatic(\$method, \$parameters)
-    {
-        \$instance = new static;
-
-        return static::___static(call_user_func_array([\$instance, \$method], \$parameters));
-    }
-
-    protected static function ___static(\$res)
-    {
-        \$test = (\$res instanceOf EloquentModel) ? \$res : ((\$res instanceOf EloquentCollection) ? \$res[0] : null);
-        if (\$test && method_exists(\$test, '___getModel')) {
-            \$cl = true;
-            if (\$res instanceOf EloquentModel) {
-                \$res = [\$res];
-                \$cl = false;
-            }
-            if (\$cl) {
-                \$pcl = new \\Propel\\Runtime\\Collection\\ObjectCollection;
-            }
-            foreach (\$res as \$m) {
-                \$m = \$m->___getModel();
-                if (\$cl) {
-                    \$pcl->append(\$m);
-                } else {
-                    return \$m;
-                }
-            }
-            return \$pcl;
-        } else {
-            return \$res;
-        }
-    }
-{$methods}}
-";
-
+        $this->fixPackageName($script);
+        $this->changeClassDeclaration($script);
+        $this->changeConstructor($script);
+        $this->renameSetMethods($script);
+        $this->renameSaveMethods($script);
+        $this->renameDeleteMethods($script);
+        $this->renameHydrateMethod($script);
+        $this->changePrePostMethods($script);
+        $this->changeMagicCallMethod($script);
+        $this->setTableMapTypeFieldNameAsDefault($script);
     }
 }
