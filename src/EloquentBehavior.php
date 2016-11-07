@@ -220,7 +220,7 @@ public function deleteTemp()
     }
 
     if ($con === null) {
-        $con = Propel::getServiceContainer()->getWriteConnection(' . $this->getTableClassName() . '::DATABASE_NAME);
+        $con = Propel::getServiceContainer()->getWriteConnection(' . $this->getTableClassName() . 'TableMap::DATABASE_NAME);
     }
 
     if (!$this->isNew) {
