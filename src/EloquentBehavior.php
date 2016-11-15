@@ -51,7 +51,11 @@ public function get{$phpname}Attribute(\$value)
 public function getAttribute($key)
 {
     $method = \'get\' . str_replace(\' \', \'\', ucwords(str_replace(\'_\', \' \', $key)));
-    return method_exists($this, $method) ? call_user_func([$this, $method]) : null;
+    try {
+        return call_user_func([$this, $method]);
+    } catch (\BadMethodCallException $e) {
+        return null;
+    }
 }
 
 /**
@@ -64,7 +68,11 @@ public function getAttribute($key)
 public function setAttribute($key, $value)
 {
     $method = \'set\' . str_replace(\' \', \'\', ucwords(str_replace(\'_\', \' \', $key)));
-    return method_exists($this, $method) ? call_user_func([$this, $method], $value) : null;
+    try {
+        return call_user_func([$this, $method], $value);
+    } catch (\BadMethodCallException $e) {
+        return null;
+    }
 }
 
 /**
