@@ -368,8 +368,8 @@ public function deleteTemp()
 
         $pattern = '/(\$this->([A-Za-z_0-9]+))->save\(\$con\)/';
         preg_match($pattern, $script, $matches);
-        if (isset($matches[1])) {
-            $replacement = '$this->${1}->save($this->${1} instanceof EloquentModel ? [$con] : $con)';
+        if (isset($matches[2])) {
+            $replacement = '$this->${2}->save($this->${2} instanceof EloquentModel ? [$con] : $con)';
             $script = preg_replace($pattern, $replacement, $script);
         }
 
@@ -403,8 +403,8 @@ public function deleteTemp()
 
         $pattern = '/(\$this->([A-Za-z_0-9]+))->delete\(\$con\)/';
         preg_match($pattern, $script, $matches);
-        if (isset($matches[1])) {
-            $replacement = '$this->${1}->delete($this->${1} instanceof EloquentModel ? [$con] : $con)';
+        if (isset($matches[2])) {
+            $replacement = '$this->${2}->delete($this->${2} instanceof EloquentModel ? [$con] : $con)';
             $script = preg_replace($pattern, $replacement, $script);
         }
 
