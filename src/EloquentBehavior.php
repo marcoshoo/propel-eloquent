@@ -5,6 +5,14 @@ use Propel\Generator\Model\Behavior;
 
 class EloquentBehavior extends Behavior
 {
+    public function objectAttributes()
+    {
+        $table = $this->getTable()->getName();
+        return "
+protected \$table = '$table';        
+        ";
+    }
+
     public function objectMethods()
     {
         $mutators = "\n";
