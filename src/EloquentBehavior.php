@@ -62,7 +62,7 @@ public function getAttribute($key)
     try {
         return call_user_func([$this, $method]);
     } catch (\BadMethodCallException $e) {
-        return null;
+        return $this->getRelationValue($key);
     }
 }
 
