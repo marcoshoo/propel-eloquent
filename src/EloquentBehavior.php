@@ -50,7 +50,7 @@ public function get{$phpname}Attribute(\$value)
         }
 
         return $mutators .
-        '/**
+            '/**
  * Get an attribute from the model.
  *
  * @param  string  $key
@@ -112,8 +112,8 @@ public function __set($key, $value)
 protected function syncAttributes()
 {
 ' . implode("\n", array_map(function ($col) {
-            return "    \$this->attributes['{$col->getName()}'] = \$this->{$col->getName()};";
-        }, $this->getTable()->getColumns())) . '
+                return "    \$this->attributes['{$col->getName()}'] = \$this->{$col->getName()};";
+            }, $this->getTable()->getColumns())) . '
 }
 
 /**
@@ -167,10 +167,8 @@ public static function hydrateTemp(array $items, $connection = null)
         return $reaged;
     };
 
-    $map = self::TABLE_MAP;
-    $class = (new $map)->getOMClass(false);
-    $model = new $class;
-
+    $model = new static;
+    
     foreach ($items as &$item) {
         $attributes = $stdToArray($item);
         $item = clone $model;
