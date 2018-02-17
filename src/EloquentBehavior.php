@@ -9,6 +9,7 @@ class EloquentBehavior extends Behavior
     {
         $table = $this->getTable()->getName();
         return "
+protected \$__accessor = false;        
 protected \$table = '$table';        
         ";
     }
@@ -43,7 +44,7 @@ public function set{$phpname}Temp(\$value)
  */
 public function get{$phpname}Attribute(\$value)
 {
-    return get{$phpname}();
+    return \$this->get{$phpname}();
 }
 
 ";
@@ -60,7 +61,11 @@ public function getAttribute($key)
 {
     $method = \'get\' . str_replace(\' \', \'\', ucwords(str_replace(\'_\', \' \', $key)));
     try {
-        return call_user_func([$this, $method]);
+        $accessor = $this->__accessor;
+        $this->__accessor = true;
+        $value = call_user_func([$this, $method]);
+        $this->__accessor = $accessor;
+        return $value;
     } catch (\BadMethodCallException $e) {
         return $this->getRelationValue($key);
     }
@@ -125,7 +130,13 @@ protected function syncAttributes()
  */
 public function setRawAttributes(array $attributes, $sync = false)
 {
-    $this->hydrateThis($attributes, 0, false, TableMap::TYPE_FIELDNAME);
+    if (!isset($attributes[0])) {    
+        foreach ($attributes as $key => $value) {        
+            $this->setAttribute($key, $value);            
+        }        
+    } else {    
+        $this->hydrateThis($attributes, 0, false, TableMap::TYPE_FIELDNAME);        
+    }
 
     if ($sync) {
         $this->syncOriginal();
