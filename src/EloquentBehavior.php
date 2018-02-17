@@ -184,6 +184,7 @@ public static function hydrateTemp(array $items, $connection = null)
         $attributes = $stdToArray($item);
         $item = clone $model;
         $item->setRawAttributes($attributes, true);
+        $item->setNew(false);
     }
 
     return $model->newCollection($items);
