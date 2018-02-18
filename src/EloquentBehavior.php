@@ -9,7 +9,8 @@ class EloquentBehavior extends Behavior
     {
         $table = $this->getTable()->getName();
         return "
-protected \$__accessor = false;        
+protected \$__accessor = false;   
+     
 protected \$table = '$table';        
         ";
     }
@@ -466,6 +467,78 @@ public function deleteTemp()
         $script = preg_replace($pattern, $replacement, $script);
     }
 
+    public function replaceDateTimeAccessors(&$script)
+    {
+        $pattern = '/return \$this->([A-Za-z_0-9]+) instanceof \\\DateTimeInterface \? \$this->([A-Za-z_0-9]+)->format\(\$format\) : null;/';
+        preg_match($pattern, $script, $matches);
+        if (isset($matches[2])) {
+            $replacement = <<<EOD
+\$format = preg_replace('/(\w)/','\\\\\\\\\\\\\\\${1}', \$format);
+            \$format = preg_replace('/\\\\\\\\\\\\\\\\\\\\\\\\\(\w)/', '\\\${1}', \$format);
+            \$format = strtr(\$format, [
+                '\d' => '%d',
+                '\D' => '%a',
+                '\j' => '%e',
+                '\l' => '%A',
+                '\N' => '%u',
+                '\S' => '%%S',
+                '\w' => '%w',
+                '\z' => '%%%%z',
+                '\W' => '%V',
+                '\F' => '%B',
+                '\m' => '%m',
+                '\M' => '%b',
+                '\\n' => '%%%%n',
+                '\\t' => '%%%%t',
+                '\L' => '%%%%L',
+                '\o' => '%C%y',
+                '\Y' => '%Y',
+                '\y' => '%y',
+                '\a' => '%p',
+                '\A' => '%p',
+                '\B' => '%%%%B',
+                '\g' => '%%%%g',
+                '\G' => '%%%%G',
+                '\h' => '%I',
+                '\H' => '%H',
+                '\i' => '%M',
+                '\s' => '%S',
+                '\u' => '%%%%u',
+                '\e' => '%Z',
+                '\I' => '%%%%I',
+                '\O' => '%%%%O',
+                '\P' => '%%%%P',
+                '\T' => '%z',
+                '\Z' => '%%%%Z',
+                '\c' => '%%%%c',
+                '\r' => '%%%%r',
+                '\U' => '%%%%U',
+            ]);
+            \$res = strftime(\$format, \$this->\${2}->getTimestamp());
+            \$res = strtr(\$res, [        
+                '%%%%S' => date('S', \$this->\${2}->getTimestamp()),
+                '%%%%z' => date('z', \$this->\${2}->getTimestamp()),
+                '%%%%n' => date('n', \$this->\${2}->getTimestamp()),
+                '%%%%t' => date('t', \$this->\${2}->getTimestamp()),
+                '%%%%L' => date('L', \$this->\${2}->getTimestamp()),
+                '%%%%B' => date('B', \$this->\${2}->getTimestamp()),
+                '%%%%g' => date('g', \$this->\${2}->getTimestamp()),
+                '%%%%G' => date('G', \$this->\${2}->getTimestamp()),
+                '%%%%u' => date('u', \$this->\${2}->getTimestamp()),
+                '%%%%I' => date('I', \$this->\${2}->getTimestamp()),
+                '%%%%O' => date('O', \$this->\${2}->getTimestamp()),
+                '%%%%P' => date('P', \$this->\${2}->getTimestamp()),
+                '%%%%Z' => date('Z', \$this->\${2}->getTimestamp()),
+                '%%%%c' => date('c', \$this->\${2}->getTimestamp()),
+                '%%%%r' => date('r', \$this->\${2}->getTimestamp()),
+                '%%%%U' => date('U', \$this->\${2}->getTimestamp()),
+            ]);
+            return \$res;
+EOD;
+            $script = preg_replace($pattern, $replacement, $script);
+        }
+    }
+
     public function tableMapFilter(&$script)
     {
         $this->fixPackageName($script);
@@ -492,5 +565,6 @@ public function deleteTemp()
         $this->changePrePostMethods($script);
         $this->changeMagicCallMethod($script);
         $this->setTableMapTypeFieldNameAsDefault($script);
+        $this->replaceDateTimeAccessors($script);
     }
 }
