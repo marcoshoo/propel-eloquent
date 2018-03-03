@@ -250,7 +250,7 @@ public function deleteTemp()
         $con = Propel::getServiceContainer()->getWriteConnection(' . $this->getTableClassName() . 'TableMap::DATABASE_NAME);
     }
 
-    if (!$this->isNew) {
+    if (!$this->isNew()) {
         if ($this->fireModelEvent(\'deleting\') === false) {
             return false;
         }
