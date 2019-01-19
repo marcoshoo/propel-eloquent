@@ -228,10 +228,11 @@ public function saveTemp(array $options = [])
 /**
  * Delete the model from the database.
  *
+ * @param  array  $options
  * @return bool|null
  * @throws \Exception
  */
-public function deleteTemp()
+public function deleteTemp(array $options = [])
 {
     $options = func_get_args();
 
@@ -249,7 +250,7 @@ public function deleteTemp()
     if ($con === null) {
         $con = Propel::getServiceContainer()->getWriteConnection(' . $this->getTableClassName() . 'TableMap::DATABASE_NAME);
     }
-
+    
     if (!$this->isNew()) {
         if ($this->fireModelEvent(\'deleting\') === false) {
             return false;
